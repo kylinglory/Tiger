@@ -38,6 +38,10 @@ const routeNames = Object.fromEntries(Object.entries(routeMap).map(([name, route
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const asset = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
+const apiOrigin = import.meta.env.VITE_API_ORIGIN || (
+  ['kylinglory.com', 'www.kylinglory.com'].includes(location.hostname) ? 'https://api.kylinglory.com' : ''
+);
+const apiUrl = (path) => `${apiOrigin}${path}`;
 const apiUnavailableMessage = '线上页面尚未部署生图后端，暂时无法生成图片。';
 
 async function readApiResponse(response) {
@@ -68,7 +72,7 @@ function App() {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    fetch('/api/health').then(readApiResponse).then((d) => setConfigured(d.configured)).catch(() => {});
+    fetch(apiUrl('/api/health')).then(readApiResponse).then((d) => setConfigured(d.configured)).catch(() => {});
     const saved = localStorage.getItem('xiaojishuo-draft');
     if (saved) {
       try {
@@ -110,7 +114,7 @@ function App() {
     if (!selectedModules.length) return setNotice('请至少选择一个页面模块');
     setStatus('submitting'); setNotice('正在提交生成任务…'); setProgress(8);
     try {
-      const response = await fetch('/api/generate', {
+      const response = await fetch(apiUrl('/api/generate'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, referenceImages: images.map((image) => image.src), aspectRatio: '4:5', n: Math.min(4, selectedModules.length) }),
       });
@@ -123,7 +127,7 @@ function App() {
       const urls = [];
       for (let attempt = 0; attempt < 80 && urls.length < tasks.length; attempt += 1) {
         await sleep(3000);
-        const results = await Promise.all(tasks.map((id) => fetch(`/api/tasks/${encodeURIComponent(id)}`).then(readApiResponse)));
+        const results = await Promise.all(tasks.map((id) => fetch(apiUrl(`/api/tasks/${encodeURIComponent(id)}`)).then(readApiResponse)));
         urls.splice(0, urls.length, ...results.flatMap((r) => r.url || r.image_url || r.data?.[0]?.url ? [r.url || r.image_url || r.data?.[0]?.url] : []));
         const avg = results.reduce((sum, r) => sum + (r.progress || (r.status === 'completed' ? 100 : 10)), 0) / Math.max(results.length, 1);
         setProgress(Math.max(10, Math.round(avg)));
@@ -269,7 +273,7 @@ function toDataUrl(file) {
 }
 
 async function submitAndPoll({ prompt, images, aspectRatio, count, onProgress }) {
-  const response = await fetch('/api/generate', {
+  const response = await fetch(apiUrl('/api/generate'), {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, referenceImages: images.map((image) => image.src), aspectRatio, n: count }),
   });
@@ -280,7 +284,7 @@ async function submitAndPoll({ prompt, images, aspectRatio, count, onProgress })
   for (let attempt = 0; attempt < 80; attempt += 1) {
     await sleep(3000);
     const results = await Promise.all(tasks.map(async (id) => {
-      const result = await fetch(`/api/tasks/${encodeURIComponent(id)}`); return readApiResponse(result);
+      const result = await fetch(apiUrl(`/api/tasks/${encodeURIComponent(id)}`)); return readApiResponse(result);
     }));
     onProgress(Math.round(results.reduce((sum, item) => sum + (item.progress || (item.status === 'completed' ? 100 : 10)), 0) / results.length));
     const failed = results.find((item) => item.status === 'failed' || item.error);
