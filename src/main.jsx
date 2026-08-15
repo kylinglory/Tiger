@@ -37,6 +37,7 @@ const routeMap = { 商品底图: 'base', 商品详情页: 'detail', 海外电商
 const routeNames = Object.fromEntries(Object.entries(routeMap).map(([name, route]) => [route, name]));
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const asset = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
 
 function App() {
   const [activeTool, setActiveTool] = useState(() => routeNames[location.hash.slice(2)] || '商品详情页');
@@ -138,7 +139,7 @@ function App() {
   return <div className="app-shell">
     <header className="topbar">
       <button className="icon-button mobile-only" onClick={() => setMobileNav(true)} aria-label="打开导航"><Menu size={20} /></button>
-      <img className="logo" src="/assets/logo.png" alt="小鸡说Ai" />
+      <img className="logo" src={asset('/assets/logo.png')} alt="小鸡说Ai" />
       <button className="new-task"><Plus size={17} /> 新建任务</button>
       <span className="task-name">当前：{activeTool.replace('商品', '')} #1 · {new Date().toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }).replace('/', '-')} 15:05</span>
       <span className={`api-state ${configured ? 'ready' : ''}`}>{configured ? '接口已连接' : '待配置密钥'}</span>
@@ -363,11 +364,11 @@ function ToolHeading({ tool, platform, market }) {
 function GeneratedGrid({ outputs }) { return <div className="generated-grid">{outputs.map((url, index) => <article key={url}><img src={url} alt={`AI 生成图片 ${index + 1}`} /><a href={url} target="_blank" rel="noreferrer">查看原图</a></article>)}</div>; }
 
 function BasePreview() {
-  return <><ToolHeading tool="商品底图" /><div className="base-preview-grid">{[['/assets/scene-commute.webp','原木禅意'],['/assets/scene-sport.webp','咖啡时光'],['/assets/scene-business.webp','礼盒派对'],['/assets/detail-hero.webp','都市夜色']].map(([src,name]) => <div key={name}><img src={src} alt={`AI 生成的 ${name} 场景示例`} /><span>{name}</span></div>)}</div><p className="demo-note">↑ 示意场景 · 支持快捷场景，也可自定义 Prompt</p></>;
+  return <><ToolHeading tool="商品底图" /><div className="base-preview-grid">{[['/assets/scene-commute.webp','原木禅意'],['/assets/scene-sport.webp','咖啡时光'],['/assets/scene-business.webp','礼盒派对'],['/assets/detail-hero.webp','都市夜色']].map(([src,name]) => <div key={name}><img src={asset(src)} alt={`AI 生成的 ${name} 场景示例`} /><span>{name}</span></div>)}</div><p className="demo-note">↑ 示意场景 · 支持快捷场景，也可自定义 Prompt</p></>;
 }
 
 function OverseasPreview({ platform, market }) {
-  return <><ToolHeading tool="海外电商" platform={platform} market={market} /><div className="market-preview"><div className="market-thumbs">{['detail','lifestyle','spec','package'].map((name, index) => <img key={name} src={`/assets/${['scene-commute.webp','scene-sport.webp','scene-business.webp','detail-hero.webp'][index]}`} alt={`${name} 副图`} />)}</div><div className="market-card"><img src="/assets/detail-hero.webp" alt="AI 生成的海外电商主图示例" /><div className="market-copy"><b>Wireless ANC Headphones, 40h Battery, BT 5.3</b><span className="stars">★★★★★ <i>(2,841)</i></span><strong>$49.99</strong><small>Free shipping · Ships in 24h</small></div></div></div><p className="demo-note">↑ 主图 / 副图 / 信息图 / A+ 例证均可生成</p></>;
+  return <><ToolHeading tool="海外电商" platform={platform} market={market} /><div className="market-preview"><div className="market-thumbs">{['detail','lifestyle','spec','package'].map((name, index) => <img key={name} src={asset(`/assets/${['scene-commute.webp','scene-sport.webp','scene-business.webp','detail-hero.webp'][index]}`)} alt={`${name} 副图`} />)}</div><div className="market-card"><img src={asset('/assets/detail-hero.webp')} alt="AI 生成的海外电商主图示例" /><div className="market-copy"><b>Wireless ANC Headphones, 40h Battery, BT 5.3</b><span className="stars">★★★★★ <i>(2,841)</i></span><strong>$49.99</strong><small>Free shipping · Ships in 24h</small></div></div></div><p className="demo-note">↑ 主图 / 副图 / 信息图 / A+ 例证均可生成</p></>;
 }
 
 function PosterTemplates({ onUse }) {
@@ -376,10 +377,10 @@ function PosterTemplates({ onUse }) {
 
 function ProductPreview() {
   return <div className="product-preview">
-    <div className="hero-image"><img src="/assets/detail-hero.webp" alt="AI 生成的产品主图示例" /><span className="seller">BEST SELLER</span><span className="rating">★★★★★ <b>4.9 / 1,283</b></span></div>
+    <div className="hero-image"><img src={asset('/assets/detail-hero.webp')} alt="AI 生成的产品主图示例" /><span className="seller">BEST SELLER</span><span className="rating">★★★★★ <b>4.9 / 1,283</b></span></div>
     <div className="feature-row"><div><Zap /><b>主动降噪</b></div><div><Box /><b>40h 续航</b></div><div><Bluetooth /><b>蓝牙 5.3</b></div></div>
     <div className="spec-row"><span>Hi-Fi 立体声</span><span>快充 10min = 6h</span><span>多端无缝连接</span></div>
-    <div className="scenes"><Scene src="/assets/scene-commute.webp" name="通勤" /><Scene src="/assets/scene-sport.webp" name="运动" /><Scene src="/assets/scene-business.webp" name="商务" /></div>
+    <div className="scenes"><Scene src={asset('/assets/scene-commute.webp')} name="通勤" /><Scene src={asset('/assets/scene-sport.webp')} name="运动" /><Scene src={asset('/assets/scene-business.webp')} name="商务" /></div>
     <div className="assurances"><span>正品保障</span><span>7 天无理由退换</span><span>顺丰包邮</span></div>
     <p className="demo-note">↑ 示意效果 · 真实生成由 AI 完成，可一键导出</p>
   </div>;
