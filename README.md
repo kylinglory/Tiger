@@ -15,7 +15,9 @@ npm run dev
 
 ## GitHub Pages
 
-公开静态访问地址：`https://kylinglory.github.io/my-website/`
+公开静态访问地址：`https://kylinglory.com/`
+
+备用访问地址：`https://kylinglory.github.io/my-website/`
 
 GitHub Pages 只托管前端静态页面，不运行 `server.js`。在线版本可以浏览界面与流程；需要真实生成图片时，请部署后端代理并配置 `XIAOJI_API_KEY`，不要把密钥写进前端代码。
 
