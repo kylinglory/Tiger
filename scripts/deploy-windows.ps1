@@ -1,5 +1,5 @@
 $ErrorActionPreference = 'Stop'
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+[System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
 
 $AppDir = 'C:\apps\xiaojishuo-api'
 $ToolsDir = 'C:\tools'
@@ -18,7 +18,7 @@ function Write-Step($Message) {
 }
 
 function Download-File($Url, $Path) {
-  $wc = New-Object Net.WebClient
+  $wc = New-Object System.Net.WebClient
   $wc.DownloadFile($Url, $Path)
 }
 
