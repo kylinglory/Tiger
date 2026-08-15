@@ -38,6 +38,18 @@ const routeNames = Object.fromEntries(Object.entries(routeMap).map(([name, route
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const asset = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
+const apiUnavailableMessage = '线上页面尚未部署生图后端，暂时无法生成图片。';
+
+async function readApiResponse(response) {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    if (response.status === 404 || response.status === 405) throw new Error(apiUnavailableMessage);
+    throw new Error('生图服务暂不可用，请稍后重试');
+  }
+  const body = await response.json();
+  if (!response.ok) throw new Error(body?.error?.message || `请求失败 (${response.status})`);
+  return body;
+}
 
 function App() {
   const [activeTool, setActiveTool] = useState(() => routeNames[location.hash.slice(2)] || '商品详情页');
@@ -56,7 +68,7 @@ function App() {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    fetch('/api/health').then((r) => r.json()).then((d) => setConfigured(d.configured)).catch(() => {});
+    fetch('/api/health').then(readApiResponse).then((d) => setConfigured(d.configured)).catch(() => {});
     const saved = localStorage.getItem('xiaojishuo-draft');
     if (saved) {
       try {
@@ -92,6 +104,7 @@ function App() {
   }
 
   async function generate() {
+    if (!configured) return setNotice(apiUnavailableMessage);
     if (!images.length) return setNotice('请先上传至少一张商品原图');
     if (!brief.trim()) return setNotice('请填写商品卖点与生成要求');
     if (!selectedModules.length) return setNotice('请至少选择一个页面模块');
@@ -101,8 +114,7 @@ function App() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt, referenceImages: images.map((image) => image.src), aspectRatio: '4:5', n: Math.min(4, selectedModules.length) }),
       });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body?.error?.message || '提交失败');
+      const body = await readApiResponse(response);
       const tasks = (body.data || [body]).map((item) => item.task_id || item.id).filter(Boolean);
       if (!tasks.length && body.data?.some((item) => item.url)) {
         setGenerated(body.data.map((item) => item.url)); setProgress(100); setStatus('done'); return;
@@ -111,7 +123,7 @@ function App() {
       const urls = [];
       for (let attempt = 0; attempt < 80 && urls.length < tasks.length; attempt += 1) {
         await sleep(3000);
-        const results = await Promise.all(tasks.map((id) => fetch(`/api/tasks/${encodeURIComponent(id)}`).then((r) => r.json())));
+        const results = await Promise.all(tasks.map((id) => fetch(`/api/tasks/${encodeURIComponent(id)}`).then(readApiResponse)));
         urls.splice(0, urls.length, ...results.flatMap((r) => r.url || r.image_url || r.data?.[0]?.url ? [r.url || r.image_url || r.data?.[0]?.url] : []));
         const avg = results.reduce((sum, r) => sum + (r.progress || (r.status === 'completed' ? 100 : 10)), 0) / Math.max(results.length, 1);
         setProgress(Math.max(10, Math.round(avg)));
@@ -214,7 +226,7 @@ function App() {
         <div className="preview-heading"><div className="eyebrow"><Sparkles size={15} />多模块 · 一键生成 · 商业可用</div><h1>商品详情页</h1><p>上传商品图，AI 即刻生成 <b>符合多电商平台规范</b> 的专业详情页。</p></div>
         {generated.length ? <div className="generated-grid">{generated.map((url, i) => <article key={url}><img src={url} alt={`AI 生成详情图 ${i + 1}`} /><a href={url} target="_blank" rel="noreferrer">查看原图</a></article>)}</div> : <ProductPreview />}
       </section>
-    </main> : <ToolWorkspace tool={activeTool} setNotice={setNotice} />}
+    </main> : <ToolWorkspace tool={activeTool} configured={configured} setNotice={setNotice} />}
 
     {notice && <div className={`toast ${status === 'error' ? 'error' : ''}`}><span>{notice}</span><button onClick={() => setNotice('')} aria-label="关闭提示"><X size={15} /></button></div>}
     {linkOpen && <div className="modal-backdrop" onClick={() => setLinkOpen(false)}><div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -261,16 +273,14 @@ async function submitAndPoll({ prompt, images, aspectRatio, count, onProgress })
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt, referenceImages: images.map((image) => image.src), aspectRatio, n: count }),
   });
-  const body = await response.json();
-  if (!response.ok) throw new Error(body?.error?.message || '提交失败');
+  const body = await readApiResponse(response);
   if (body.data?.some((item) => item.url)) return body.data.map((item) => item.url).filter(Boolean);
   const tasks = (body.data || [body]).map((item) => item.task_id || item.id).filter(Boolean);
   if (!tasks.length) throw new Error('接口未返回任务 ID');
   for (let attempt = 0; attempt < 80; attempt += 1) {
     await sleep(3000);
     const results = await Promise.all(tasks.map(async (id) => {
-      const result = await fetch(`/api/tasks/${encodeURIComponent(id)}`); const data = await result.json();
-      if (!result.ok) throw new Error(data?.error?.message || '任务查询失败'); return data;
+      const result = await fetch(`/api/tasks/${encodeURIComponent(id)}`); return readApiResponse(result);
     }));
     onProgress(Math.round(results.reduce((sum, item) => sum + (item.progress || (item.status === 'completed' ? 100 : 10)), 0) / results.length));
     const failed = results.find((item) => item.status === 'failed' || item.error);
@@ -281,7 +291,7 @@ async function submitAndPoll({ prompt, images, aspectRatio, count, onProgress })
   throw new Error('生成时间较长，请稍后重试');
 }
 
-function ToolWorkspace({ tool, setNotice }) {
+function ToolWorkspace({ tool, configured, setNotice }) {
   const isBase = tool === '商品底图'; const isOverseas = tool === '海外电商'; const isPoster = tool === '设计海报';
   const maxImages = isBase ? 1 : 3;
   const inputRef = useRef(null);
@@ -305,6 +315,7 @@ function ToolWorkspace({ tool, setNotice }) {
   }
 
   async function run() {
+    if (!configured) return setNotice(apiUnavailableMessage);
     if (!isPoster && !images.length) return setNotice('请先上传产品图');
     if (isPoster && !text.trim()) return setNotice('请先输入海报 Prompt 或选择模板');
     if (!isPoster && !selected.length) return setNotice('请至少选择一个生成场景或模块');
