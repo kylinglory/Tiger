@@ -6,7 +6,7 @@ $ToolsDir = 'C:\tools'
 $CaddyDir = Join-Path $ToolsDir 'caddy'
 $TempDir = Join-Path $env:TEMP ('xiaojishuo-deploy-' + [guid]::NewGuid().ToString('N'))
 $RepoZip = Join-Path $TempDir 'repo.zip'
-$RepoUrl = 'https://github.com/kylinglory/my-website/archive/refs/heads/main.zip'
+$RepoUrl = 'https://codeload.github.com/kylinglory/my-website/zip/refs/heads/main'
 $NodeMsi = Join-Path $TempDir 'node-v18.20.4-x64.msi'
 $NodeUrl = 'https://nodejs.org/dist/v18.20.4/node-v18.20.4-x64.msi'
 $CaddyZip = Join-Path $TempDir 'caddy.zip'
@@ -92,11 +92,19 @@ if (Test-Path $EnvFile) {
     'ALLOWED_ORIGINS=https://kylinglory.com,https://www.kylinglory.com'
   ) -join "`r`n"
 }
-$appUser = Read-Host 'Set website login username'
-$securePassword = Read-Host 'Set website login password' -AsSecureString
-$bstrPassword = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
-try { $appPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstrPassword) }
-finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstrPassword) }
+if ($env:DEPLOY_APP_USERNAME) {
+  $appUser = $env:DEPLOY_APP_USERNAME
+} else {
+  $appUser = Read-Host 'Set website login username'
+}
+if ($env:DEPLOY_APP_PASSWORD) {
+  $appPassword = $env:DEPLOY_APP_PASSWORD
+} else {
+  $securePassword = Read-Host 'Set website login password' -AsSecureString
+  $bstrPassword = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+  try { $appPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstrPassword) }
+  finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstrPassword) }
+}
 $secretBytes = New-Object byte[] 32
 $rng = [Security.Cryptography.RNGCryptoServiceProvider]::Create()
 try { $rng.GetBytes($secretBytes) }
