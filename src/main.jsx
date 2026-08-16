@@ -39,11 +39,12 @@ const routeNames = Object.fromEntries(Object.entries(routeMap).map(([name, route
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const asset = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
 const apiOrigin = import.meta.env.VITE_API_ORIGIN || (
-  ['kylinglory.com', 'www.kylinglory.com'].includes(location.hostname) ? 'https://api.kylinglory.com' : ''
+  location.hostname.endsWith('github.io') ? 'https://api.kylinglory.com' : ''
 );
 const apiUrl = (path) => `${apiOrigin}${path}`;
 const apiUnavailableMessage = '线上页面尚未部署生图后端，暂时无法生成图片。';
 const authStorageKey = 'kylin-glory-auth-token';
+const authHeader = (token) => token?.includes('.') ? { Authorization: `Bearer ${token}` } : {};
 
 async function readApiResponse(response) {
   const contentType = response.headers.get('content-type') || '';
@@ -82,10 +83,10 @@ function App() {
     fetch(apiUrl('/api/health')).then(readApiResponse).then((d) => {
       setConfigured(d.configured);
       setAuthRequired(Boolean(d.authRequired));
-      if (d.authRequired && authToken) {
-        fetch(apiUrl('/api/me'), { headers: { Authorization: `Bearer ${authToken}` } })
+      if (d.authRequired) {
+        fetch(apiUrl('/api/me'), { headers: authHeader(authToken) })
           .then(readApiResponse)
-          .then((me) => setAuthUser(me.username || '已登录'))
+          .then((me) => { setAuthUser(me.username || '已登录'); if (!authToken) setAuthToken('cookie-session'); })
           .catch(() => { localStorage.removeItem(authStorageKey); setAuthToken(''); });
       }
     }).catch(() => {});
@@ -133,7 +134,7 @@ function App() {
     try {
       const response = await fetch(apiUrl('/api/generate'), {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
+        headers: { 'Content-Type': 'application/json', ...authHeader(authToken) },
         body: JSON.stringify({ prompt, referenceImages: images.map((image) => image.src), aspectRatio: '4:5', n: Math.min(4, selectedModules.length) }),
       });
       const body = await readApiResponse(response);
@@ -146,7 +147,7 @@ function App() {
       for (let attempt = 0; attempt < 80 && urls.length < tasks.length; attempt += 1) {
         await sleep(3000);
         const results = await Promise.all(tasks.map((id) => fetch(apiUrl(`/api/tasks/${encodeURIComponent(id)}`), {
-          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+          headers: authHeader(authToken),
         }).then(readApiResponse)));
         urls.splice(0, urls.length, ...results.flatMap((r) => r.url || r.image_url || r.data?.[0]?.url ? [r.url || r.image_url || r.data?.[0]?.url] : []));
         const avg = results.reduce((sum, r) => sum + (r.progress || (r.status === 'completed' ? 100 : 10)), 0) / Math.max(results.length, 1);
@@ -186,6 +187,7 @@ function App() {
   }
 
   function logout() {
+    fetch(apiUrl('/api/logout'), { method: 'POST', headers: authHeader(authToken) }).catch(() => {});
     localStorage.removeItem(authStorageKey);
     setAuthToken('');
     setAuthUser('');
@@ -337,7 +339,7 @@ function toDataUrl(file) {
 async function submitAndPoll({ prompt, images, aspectRatio, count, authToken, onProgress }) {
   const response = await fetch(apiUrl('/api/generate'), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
+    headers: { 'Content-Type': 'application/json', ...authHeader(authToken) },
     body: JSON.stringify({ prompt, referenceImages: images.map((image) => image.src), aspectRatio, n: count }),
   });
   const body = await readApiResponse(response);
@@ -348,7 +350,7 @@ async function submitAndPoll({ prompt, images, aspectRatio, count, authToken, on
     await sleep(3000);
     const results = await Promise.all(tasks.map(async (id) => {
       const result = await fetch(apiUrl(`/api/tasks/${encodeURIComponent(id)}`), {
-        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        headers: authHeader(authToken),
       }); return readApiResponse(result);
     }));
     onProgress(Math.round(results.reduce((sum, item) => sum + (item.progress || (item.status === 'completed' ? 100 : 10)), 0) / results.length));
