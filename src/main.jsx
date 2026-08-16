@@ -43,6 +43,7 @@ const apiOrigin = import.meta.env.VITE_API_ORIGIN || (
 );
 const apiUrl = (path) => `${apiOrigin}${path}`;
 const apiUnavailableMessage = '线上页面尚未部署生图后端，暂时无法生成图片。';
+const authStorageKey = 'kylin-glory-auth-token';
 
 async function readApiResponse(response) {
   const contentType = response.headers.get('content-type') || '';
@@ -69,10 +70,25 @@ function App() {
   const [linkOpen, setLinkOpen] = useState(false);
   const [linkValue, setLinkValue] = useState('');
   const [configured, setConfigured] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [authToken, setAuthToken] = useState(() => localStorage.getItem(authStorageKey) || '');
+  const [authUser, setAuthUser] = useState('');
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [loginStatus, setLoginStatus] = useState('idle');
   const inputRef = useRef(null);
 
   useEffect(() => {
-    fetch(apiUrl('/api/health')).then(readApiResponse).then((d) => setConfigured(d.configured)).catch(() => {});
+    fetch(apiUrl('/api/health')).then(readApiResponse).then((d) => {
+      setConfigured(d.configured);
+      setAuthRequired(Boolean(d.authRequired));
+      if (d.authRequired && authToken) {
+        fetch(apiUrl('/api/me'), { headers: { Authorization: `Bearer ${authToken}` } })
+          .then(readApiResponse)
+          .then((me) => setAuthUser(me.username || '已登录'))
+          .catch(() => { localStorage.removeItem(authStorageKey); setAuthToken(''); });
+      }
+    }).catch(() => {});
     const saved = localStorage.getItem('xiaojishuo-draft');
     if (saved) {
       try {
@@ -109,13 +125,15 @@ function App() {
 
   async function generate() {
     if (!configured) return setNotice(apiUnavailableMessage);
+    if (authRequired && !authToken) { setLoginOpen(true); return setNotice('请先登录后再使用生图功能'); }
     if (!images.length) return setNotice('请先上传至少一张商品原图');
     if (!brief.trim()) return setNotice('请填写商品卖点与生成要求');
     if (!selectedModules.length) return setNotice('请至少选择一个页面模块');
     setStatus('submitting'); setNotice('正在提交生成任务…'); setProgress(8);
     try {
       const response = await fetch(apiUrl('/api/generate'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
         body: JSON.stringify({ prompt, referenceImages: images.map((image) => image.src), aspectRatio: '4:5', n: Math.min(4, selectedModules.length) }),
       });
       const body = await readApiResponse(response);
@@ -127,7 +145,9 @@ function App() {
       const urls = [];
       for (let attempt = 0; attempt < 80 && urls.length < tasks.length; attempt += 1) {
         await sleep(3000);
-        const results = await Promise.all(tasks.map((id) => fetch(apiUrl(`/api/tasks/${encodeURIComponent(id)}`)).then(readApiResponse)));
+        const results = await Promise.all(tasks.map((id) => fetch(apiUrl(`/api/tasks/${encodeURIComponent(id)}`), {
+          headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+        }).then(readApiResponse)));
         urls.splice(0, urls.length, ...results.flatMap((r) => r.url || r.image_url || r.data?.[0]?.url ? [r.url || r.image_url || r.data?.[0]?.url] : []));
         const avg = results.reduce((sum, r) => sum + (r.progress || (r.status === 'completed' ? 100 : 10)), 0) / Math.max(results.length, 1);
         setProgress(Math.max(10, Math.round(avg)));
@@ -139,6 +159,37 @@ function App() {
     } catch (error) {
       setStatus('error'); setProgress(0); setNotice(error.message);
     }
+  }
+
+  async function login(event) {
+    event.preventDefault();
+    setLoginStatus('running');
+    setNotice('');
+    try {
+      const response = await fetch(apiUrl('/api/login'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(loginForm),
+      });
+      const body = await readApiResponse(response);
+      localStorage.setItem(authStorageKey, body.token);
+      setAuthToken(body.token);
+      setAuthUser(body.username || loginForm.username);
+      setLoginForm({ username: '', password: '' });
+      setLoginOpen(false);
+      setLoginStatus('done');
+      setNotice('登录成功');
+    } catch (error) {
+      setLoginStatus('error');
+      setNotice(error.message);
+    }
+  }
+
+  function logout() {
+    localStorage.removeItem(authStorageKey);
+    setAuthToken('');
+    setAuthUser('');
+    setNotice('已退出登录');
   }
 
   function smartWrite() {
@@ -159,7 +210,9 @@ function App() {
       <button className="new-task"><Plus size={17} /> 新建任务</button>
       <span className="task-name">当前：{activeTool.replace('商品', '')} #1 · {new Date().toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }).replace('/', '-')} 15:05</span>
       <span className={`api-state ${configured ? 'ready' : ''}`}>{configured ? '接口已连接' : '待配置密钥'}</span>
-      <button className="login"><LogIn size={15} /> 登录 / 注册</button>
+      <button className="login" onClick={() => authToken ? logout() : setLoginOpen(true)} title={authToken ? `当前账号：${authUser || '已登录'}，点击退出` : '登录'}>
+        <LogIn size={15} /> {authToken ? '已登录' : '登录'}
+      </button>
     </header>
 
     <aside className={`sidebar ${mobileNav ? 'open' : ''}`}>
@@ -230,7 +283,7 @@ function App() {
         <div className="preview-heading"><div className="eyebrow"><Sparkles size={15} />多模块 · 一键生成 · 商业可用</div><h1>商品详情页</h1><p>上传商品图，AI 即刻生成 <b>符合多电商平台规范</b> 的专业详情页。</p></div>
         {generated.length ? <div className="generated-grid">{generated.map((url, i) => <article key={url}><img src={url} alt={`AI 生成详情图 ${i + 1}`} /><a href={url} target="_blank" rel="noreferrer">查看原图</a></article>)}</div> : <ProductPreview />}
       </section>
-    </main> : <ToolWorkspace tool={activeTool} configured={configured} setNotice={setNotice} />}
+    </main> : <ToolWorkspace tool={activeTool} configured={configured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} />}
 
     {notice && <div className={`toast ${status === 'error' ? 'error' : ''}`}><span>{notice}</span><button onClick={() => setNotice('')} aria-label="关闭提示"><X size={15} /></button></div>}
     {linkOpen && <div className="modal-backdrop" onClick={() => setLinkOpen(false)}><div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -238,6 +291,15 @@ function App() {
       <p>粘贴公开可访问的商品图片地址</p><input autoFocus value={linkValue} onChange={(e) => setLinkValue(e.target.value)} placeholder="https://example.com/product.jpg" />
       <button className="primary" onClick={() => { if (linkValue) setImages((prev) => [...prev, { name: '链接图片', src: linkValue }].slice(0, 3)); setLinkOpen(false); setLinkValue(''); }}>导入图片</button>
     </div></div>}
+    {loginOpen && <div className="modal-backdrop" onClick={() => setLoginOpen(false)}><form className="modal login-modal" onSubmit={login} onClick={(e) => e.stopPropagation()}>
+      <div className="modal-title"><h3>登录</h3><button type="button" className="icon-button" onClick={() => setLoginOpen(false)}><X /></button></div>
+      <p>请输入管理员账号和密码</p>
+      <input autoFocus value={loginForm.username} onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })} placeholder="账号" autoComplete="username" />
+      <input type="password" value={loginForm.password} onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })} placeholder="密码" autoComplete="current-password" />
+      <button className="primary" disabled={loginStatus === 'running' || !loginForm.username || !loginForm.password}>
+        {loginStatus === 'running' ? '登录中…' : '登录'}
+      </button>
+    </form></div>}
   </div>;
 }
 
@@ -272,9 +334,10 @@ function toDataUrl(file) {
   });
 }
 
-async function submitAndPoll({ prompt, images, aspectRatio, count, onProgress }) {
+async function submitAndPoll({ prompt, images, aspectRatio, count, authToken, onProgress }) {
   const response = await fetch(apiUrl('/api/generate'), {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}) },
     body: JSON.stringify({ prompt, referenceImages: images.map((image) => image.src), aspectRatio, n: count }),
   });
   const body = await readApiResponse(response);
@@ -284,7 +347,9 @@ async function submitAndPoll({ prompt, images, aspectRatio, count, onProgress })
   for (let attempt = 0; attempt < 80; attempt += 1) {
     await sleep(3000);
     const results = await Promise.all(tasks.map(async (id) => {
-      const result = await fetch(apiUrl(`/api/tasks/${encodeURIComponent(id)}`)); return readApiResponse(result);
+      const result = await fetch(apiUrl(`/api/tasks/${encodeURIComponent(id)}`), {
+        headers: authToken ? { Authorization: `Bearer ${authToken}` } : {},
+      }); return readApiResponse(result);
     }));
     onProgress(Math.round(results.reduce((sum, item) => sum + (item.progress || (item.status === 'completed' ? 100 : 10)), 0) / results.length));
     const failed = results.find((item) => item.status === 'failed' || item.error);
@@ -295,7 +360,7 @@ async function submitAndPoll({ prompt, images, aspectRatio, count, onProgress })
   throw new Error('生成时间较长，请稍后重试');
 }
 
-function ToolWorkspace({ tool, configured, setNotice }) {
+function ToolWorkspace({ tool, configured, authRequired, authToken, onLoginRequired, setNotice }) {
   const isBase = tool === '商品底图'; const isOverseas = tool === '海外电商'; const isPoster = tool === '设计海报';
   const maxImages = isBase ? 1 : 3;
   const inputRef = useRef(null);
@@ -320,6 +385,7 @@ function ToolWorkspace({ tool, configured, setNotice }) {
 
   async function run() {
     if (!configured) return setNotice(apiUnavailableMessage);
+    if (authRequired && !authToken) { onLoginRequired(); return setNotice('请先登录后再使用生图功能'); }
     if (!isPoster && !images.length) return setNotice('请先上传产品图');
     if (isPoster && !text.trim()) return setNotice('请先输入海报 Prompt 或选择模板');
     if (!isPoster && !selected.length) return setNotice('请至少选择一个生成场景或模块');
@@ -331,7 +397,7 @@ function ToolWorkspace({ tool, configured, setNotice }) {
     setStatus('running'); setProgress(5); setOutputs([]); setNotice('任务已提交，正在生成…');
     try {
       const count = isPoster ? 1 : Math.min(4, selected.length);
-      const urls = await submitAndPoll({ prompt, images, aspectRatio: ratio, count, onProgress: setProgress });
+      const urls = await submitAndPoll({ prompt, images, aspectRatio: ratio, count, authToken, onProgress: setProgress });
       setOutputs(urls); setProgress(100); setStatus('done'); setNotice(`已生成 ${urls.length} 张图片`);
     } catch (error) { setStatus('error'); setProgress(0); setNotice(error.message); }
   }
