@@ -6,7 +6,7 @@ button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
 .app-shell { min-height: 100vh; }
 .topbar { height: 80px; display: flex; align-items: center; gap: 24px; padding: 0 20px; background: #fff; border-bottom: 1px solid #e7e9ef; position: fixed; inset: 0 0 auto 0; z-index: 20; }
-.logo { width: 120px; height: 42px; object-fit: contain; object-position: left center; }
+.logo { width: 120px; height: 60px; object-fit: contain; object-position: left center; }
 .new-task { margin-left: 90px; height: 38px; padding: 0 15px; border: 0; border-radius: 7px; display: flex; align-items: center; gap: 7px; background: #f2f7ff; color: #1f67de; font-weight: 600; }
 .task-name { color: #8b909b; font-size: 14px; }
 .api-state { margin-left: auto; font-size: 12px; padding: 5px 9px; color: #a47608; background: #fff7d8; border-radius: 999px; }
@@ -170,7 +170,7 @@ button:disabled { cursor: not-allowed; }
 @media (max-width: 980px) {
   .topbar { height: 64px; gap: 10px; }
   .mobile-only { display: grid; }
-  .logo { width: 96px; }
+  .logo { width: 96px; height: 52px; }
   .new-task { margin-left: 0; }
   .task-name, .api-state { display: none; }
   .login { margin-left: auto; }
