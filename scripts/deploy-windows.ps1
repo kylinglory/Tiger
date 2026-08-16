@@ -77,23 +77,51 @@ Copy-Item (Join-Path $SourceDir.FullName '*') $AppDir -Recurse -Force
 
 Write-Step 'Preparing environment file'
 $EnvFile = Join-Path $AppDir '.env'
-if (-not (Test-Path $EnvFile)) {
+if (Test-Path $EnvFile) {
+  $existingEnv = Get-Content $EnvFile -Raw
+} else {
   $secure = Read-Host 'Paste XIAOJI_API_KEY, then press Enter' -AsSecureString
   $bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)
   try { $apiKey = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstr) }
   finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }
-  @(
+  $existingEnv = @(
     "XIAOJI_API_KEY=$apiKey"
     'XIAOJI_API_BASE=https://xiaoji.baziapi.site/v1'
     'PORT=8787'
     'NODE_ENV=production'
     'ALLOWED_ORIGINS=https://kylinglory.com,https://www.kylinglory.com'
-  ) | Set-Content -Encoding UTF8 $EnvFile
+  ) -join "`r`n"
 }
+$appUser = Read-Host 'Set website login username'
+$securePassword = Read-Host 'Set website login password' -AsSecureString
+$bstrPassword = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+try { $appPassword = [Runtime.InteropServices.Marshal]::PtrToStringAuto($bstrPassword) }
+finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstrPassword) }
+$secretBytes = New-Object byte[] 32
+$rng = [Security.Cryptography.RNGCryptoServiceProvider]::Create()
+try { $rng.GetBytes($secretBytes) }
+finally { $rng.Dispose() }
+$sessionSecret = [Convert]::ToBase64String($secretBytes)
+$cleanEnv = $existingEnv `
+  -replace '(?m)^APP_USERNAME=.*\r?\n?', '' `
+  -replace '(?m)^APP_PASSWORD=.*\r?\n?', '' `
+  -replace '(?m)^APP_SESSION_SECRET=.*\r?\n?', '' `
+  -replace '(?m)^NODE_ENV=.*\r?\n?', '' `
+  -replace '(?m)^ALLOWED_ORIGINS=.*\r?\n?', ''
+@(
+  $cleanEnv.Trim()
+  'NODE_ENV=production'
+  'ALLOWED_ORIGINS=https://kylinglory.com,https://www.kylinglory.com,https://api.kylinglory.com'
+  "APP_USERNAME=$appUser"
+  "APP_PASSWORD=$appPassword"
+  "APP_SESSION_SECRET=$sessionSecret"
+) | Where-Object { $_ } | Set-Content -Encoding UTF8 $EnvFile
 
-Write-Step 'Installing backend dependencies'
+Write-Step 'Installing dependencies and building private frontend'
 Push-Location $AppDir
-& $npmCmd install --omit=dev --no-audit --no-fund
+& $npmCmd install --no-audit --no-fund
+& $npmCmd run build
+& $npmCmd prune --omit=dev --no-audit --no-fund
 Pop-Location
 
 Write-Step 'Configuring startup task for API'
@@ -115,7 +143,7 @@ if (-not (Test-Path $CaddyExe)) {
 }
 $Caddyfile = Join-Path $CaddyDir 'Caddyfile'
 @"
-api.kylinglory.com {
+kylinglory.com, www.kylinglory.com, api.kylinglory.com {
   reverse_proxy 127.0.0.1:8787
 }
 "@ | Set-Content -Encoding ASCII $Caddyfile
@@ -131,4 +159,4 @@ Start-Sleep -Seconds 3
 $health = Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:8787/api/health'
 Write-Host $health.Content
 Write-Host ''
-Write-Host 'DONE: backend is running on http://127.0.0.1:8787 and proxied by api.kylinglory.com when DNS/security group are ready.' -ForegroundColor Green
+Write-Host 'DONE: private website is running on http://127.0.0.1:8787 and proxied by kylinglory.com / api.kylinglory.com when DNS/security group are ready.' -ForegroundColor Green
