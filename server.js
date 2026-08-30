@@ -1,11 +1,21 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { createHmac, timingSafeEqual } from 'crypto';
+import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
 const apiBase = process.env.XIAOJI_API_BASE || 'https://xiaoji.baziapi.site/v1';
+const videoApiBase = process.env.VIDEO_API_BASE || 'https://xjjuhe.site/v1';
+const videoApiKey = process.env.VIDEO_API_KEY || process.env.XIAOJI_API_KEY;
+const parseApiBase = process.env.PARSE_API_BASE || videoApiBase;
+const parseApiKey = process.env.PARSE_API_KEY || videoApiKey;
+const digitalHumanApiBase = process.env.DIGITAL_HUMAN_API_BASE || parseApiBase;
+const digitalHumanApiKey = process.env.DIGITAL_HUMAN_API_KEY || parseApiKey;
+const editorApiBase = process.env.EDITOR_API_BASE || digitalHumanApiBase;
+const editorApiKey = process.env.EDITOR_API_KEY || digitalHumanApiKey;
+const creativeApiBase = process.env.CREATIVE_API_BASE || editorApiBase;
+const creativeApiKey = process.env.CREATIVE_API_KEY || editorApiKey;
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://kylinglory.com,https://www.kylinglory.com,http://localhost:5173,http://127.0.0.1:5173')
   .split(',').map((origin) => origin.trim()).filter(Boolean);
 const appUsername = process.env.APP_USERNAME || '';
@@ -30,6 +40,22 @@ app.use(express.urlencoded({ extended: false }));
 const authHeaders = () => ({
   Authorization: `Bearer ${process.env.XIAOJI_API_KEY}`,
   'Content-Type': 'application/json',
+});
+
+const videoAuthHeaders = () => ({
+  Authorization: `Bearer ${videoApiKey}`,
+  'Content-Type': 'application/json',
+});
+
+const parseAuthHeaders = () => ({
+  Authorization: `Bearer ${parseApiKey}`,
+  'Content-Type': 'application/json',
+});
+
+const digitalHumanHeaders = (withJson = true) => ({
+  Authorization: `Bearer ${digitalHumanApiKey}`,
+  'Idempotency-Key': randomUUID(),
+  ...(withJson ? { 'Content-Type': 'application/json' } : {}),
 });
 
 function safeEqual(left, right) {
@@ -150,8 +176,52 @@ async function proxyJson(url, options) {
   return body;
 }
 
+async function proxyJsonWithRetry(url, options, attempts = 3) {
+  let lastError;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      return await proxyJson(url, options);
+    } catch (error) {
+      lastError = error;
+      if (![429, 502, 503].includes(error.status) || attempt === attempts - 1) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 1200 * (attempt + 1)));
+    }
+  }
+  throw lastError;
+}
+
+function amazonLookup(value, selectedMarketplace) {
+  const input = String(value || '').trim();
+  const directAsin = input.match(/^[A-Z0-9]{10}$/i)?.[0];
+  let asin = directAsin;
+  let marketplace = selectedMarketplace;
+  let canonicalUrl = input;
+  try {
+    const parsed = new URL(input);
+    asin ||= parsed.pathname.match(/\/(?:dp|gp\/product|product)\/([A-Z0-9]{10})(?:\/|$)/i)?.[1];
+    asin ||= parsed.searchParams.get('asin')?.match(/^[A-Z0-9]{10}$/i)?.[0];
+    const host = parsed.hostname.toLowerCase();
+    marketplace ||= host.endsWith('.co.uk') ? 'uk' : host.endsWith('.de') ? 'de' : host.endsWith('.co.jp') ? 'jp' : host.endsWith('.ca') ? 'ca' : host.endsWith('.com') ? 'us' : '';
+    parsed.search = '';
+    parsed.hash = '';
+    canonicalUrl = parsed.toString();
+  } catch { /* allow a direct ASIN */ }
+  return { asin: asin?.toUpperCase(), marketplace, canonicalUrl };
+}
+
 app.get('/api/health', (_req, res) => {
-  res.json({ configured: Boolean(process.env.XIAOJI_API_KEY), model: 'gpt-image-2', authRequired });
+  res.json({
+    configured: Boolean(process.env.XIAOJI_API_KEY),
+    videoConfigured: Boolean(videoApiKey),
+    parseConfigured: Boolean(parseApiKey),
+    digitalHumanConfigured: Boolean(digitalHumanApiKey),
+    editorConfigured: Boolean(editorApiKey),
+    faceConfigured: Boolean(creativeApiKey),
+    pptConfigured: Boolean(creativeApiKey),
+    model: 'gpt-image-2',
+    videoModels: ['veo_3_1-fast-fl', 'omni_flash-10s', 'sora-2-12s'],
+    authRequired,
+  });
 });
 
 app.get('/api', (_req, res) => {
@@ -226,6 +296,272 @@ app.get('/api/tasks/:taskId', requireLogin, async (req, res) => {
   if (!/^task_[A-Za-z0-9_-]+$/.test(req.params.taskId)) return res.status(400).json({ error: { message: '无效的任务 ID' } });
   try {
     res.json(await proxyJson(`${apiBase}/images/generations/${req.params.taskId}`, { headers: authHeaders() }));
+  } catch (error) {
+    res.status(error.status || 500).json({ error: { message: error.message, code: error.code } });
+  }
+});
+
+const videoModels = new Set(['veo_3_1-fast-fl', 'omni_flash-10s', 'sora-2-12s']);
+const videoSizes = new Set(['1280x720', '1920x1080', '720x1280', '1080x1920']);
+
+app.post('/api/videos', requireLogin, async (req, res) => {
+  if (!videoApiKey) {
+    return res.status(503).json({ error: { message: '视频接口已接好，请先配置 VIDEO_API_KEY' } });
+  }
+
+  const { model = 'omni_flash-10s', prompt, size = '1280x720', images = [], promptExtend = '' } = req.body || {};
+  if (!videoModels.has(model)) return res.status(400).json({ error: { message: '不支持的视频模型' } });
+  if (!prompt?.trim()) return res.status(400).json({ error: { message: '请填写视频内容描述' } });
+  if (prompt.length > 4000) return res.status(400).json({ error: { message: '视频描述不能超过 4000 字' } });
+  if (!videoSizes.has(size)) return res.status(400).json({ error: { message: '不支持的视频尺寸' } });
+
+  const maxImages = model === 'omni_flash-10s' ? 7 : 2;
+  const references = Array.isArray(images) ? images.filter((item) => typeof item === 'string' && item.length).slice(0, maxImages) : [];
+  if (model === 'veo_3_1-fast-fl' && !references.length) {
+    return res.status(400).json({ error: { message: 'Veo 模型需要上传 1–2 张参考图' } });
+  }
+
+  try {
+    const data = await proxyJson(`${videoApiBase}/videos`, {
+      method: 'POST',
+      headers: videoAuthHeaders(),
+      body: JSON.stringify({
+        model,
+        prompt: prompt.trim(),
+        size,
+        ...(references.length ? { images: references } : {}),
+        ...(promptExtend.trim() ? { prompt_extend: promptExtend.trim() } : {}),
+      }),
+    });
+    res.json(data);
+  } catch (error) {
+    res.status(error.status || 500).json({ error: { message: error.message, code: error.code } });
+  }
+});
+
+app.get('/api/videos/:id', requireLogin, async (req, res) => {
+  if (!videoApiKey) return res.status(503).json({ error: { message: '尚未配置视频 API Key' } });
+  if (!/^[A-Za-z0-9_-]{6,160}$/.test(req.params.id)) {
+    return res.status(400).json({ error: { message: '无效的视频任务 ID' } });
+  }
+  try {
+    res.json(await proxyJson(`${videoApiBase}/videos/${encodeURIComponent(req.params.id)}`, {
+      headers: videoAuthHeaders(),
+    }));
+  } catch (error) {
+    res.status(error.status || 500).json({ error: { message: error.message, code: error.code } });
+  }
+});
+
+const parsePlatforms = new Set(['shopee', 'amazon', 'xhs', 'douyin', 'wechat-channels', 'instagram']);
+
+app.post('/api/parse', requireLogin, async (req, res) => {
+  if (!parseApiKey) return res.status(503).json({ error: { message: '商品解析接口尚未配置' } });
+  const { platform, url = '', keyword = '', type = 'note', lang = '', marketplace = '', translate = '', limit = 20 } = req.body || {};
+  if (!parsePlatforms.has(platform)) return res.status(400).json({ error: { message: '不支持的解析平台' } });
+  if (platform === 'xhs' && type === 'search' ? !keyword.trim() : !url.trim()) {
+    return res.status(400).json({ error: { message: platform === 'xhs' && type === 'search' ? '请输入搜索关键词' : '请输入商品或内容链接' } });
+  }
+
+  try {
+    if (platform === 'amazon') {
+      const lookup = amazonLookup(url, marketplace);
+      const query = new URLSearchParams(lookup.asin ? { asin: lookup.asin } : { url: lookup.canonicalUrl });
+      if (lookup.marketplace) query.set('marketplace', lookup.marketplace);
+      if (translate) query.set('translate', translate);
+      return res.json(await proxyJsonWithRetry(`${parseApiBase}/parse/amazon?${query}`, { headers: parseAuthHeaders() }));
+    }
+
+    const body = platform === 'shopee'
+      ? { url: url.trim(), ...(lang ? { lang } : {}) }
+      : platform === 'xhs'
+        ? { type, limit: Math.min(Math.max(Number(limit) || 20, 1), 200), ...(type === 'search' ? { keyword: keyword.trim() } : { url: url.trim() }) }
+        : { url: url.trim() };
+    res.json(await proxyJsonWithRetry(`${parseApiBase}/parse/${platform}`, {
+      method: 'POST', headers: parseAuthHeaders(), body: JSON.stringify(body),
+    }));
+  } catch (error) {
+    const busy = [429, 502, 503].includes(error.status);
+    res.status(error.status || 500).json({ error: { message: busy ? `${platform === 'amazon' ? '亚马逊' : '商品'}解析服务暂时繁忙，已自动重试 3 次，请稍后再试` : error.message, code: error.code } });
+  }
+});
+
+function dataUrlFile(dataUrl, filename) {
+  const match = /^data:([^;,]+);base64,([A-Za-z0-9+/=\r\n]+)$/.exec(String(dataUrl || ''));
+  if (!match) throw new Error('素材文件格式无效');
+  const buffer = Buffer.from(match[2], 'base64');
+  if (!buffer.length || buffer.length > 25 * 1024 * 1024) throw new Error('本地素材不能超过 25MB');
+  return { blob: new Blob([buffer], { type: match[1] }), filename: String(filename || 'upload').slice(0, 160) };
+}
+
+app.post('/api/digital-human/files', requireLogin, async (req, res) => {
+  if (!digitalHumanApiKey) return res.status(503).json({ error: { message: '数字人接口尚未配置' } });
+  try {
+    const { dataUrl, filename, purpose = 'avatar_image' } = req.body || {};
+    if (!['avatar_image', 'video_driving_audio', 'voice_clone', 'asr'].includes(purpose)) {
+      return res.status(400).json({ error: { message: '不支持的素材用途' } });
+    }
+    const file = dataUrlFile(dataUrl, filename);
+    const form = new FormData();
+    form.append('purpose', purpose);
+    form.append('file', file.blob, file.filename);
+    res.json(await proxyJson(`${digitalHumanApiBase}/digital-human/files`, {
+      method: 'POST', headers: digitalHumanHeaders(false), body: form,
+    }));
+  } catch (error) {
+    res.status(error.status || 500).json({ error: { message: error.message, code: error.code } });
+  }
+});
+
+const digitalHumanCreatePaths = {
+  'image-template': 'avatars/templates',
+  'video-clone': 'video-avatars/clones',
+  speech: 'audio/speech',
+  'image-generation': 'videos/generations',
+  'video-generation': 'video-avatars/generations',
+};
+
+const digitalHumanQueryPaths = {
+  'image-template': 'avatars/template-tasks',
+  'video-clone': 'video-avatars/clones',
+  speech: 'audio/speech',
+  'image-generation': 'videos/generations',
+  'video-generation': 'video-avatars/generations',
+};
+
+app.post('/api/digital-human/tasks', requireLogin, async (req, res) => {
+  if (!digitalHumanApiKey) return res.status(503).json({ error: { message: '数字人接口尚未配置' } });
+  const { action, payload } = req.body || {};
+  const path = digitalHumanCreatePaths[action];
+  if (!path || !payload || typeof payload !== 'object' || Array.isArray(payload)) {
+    return res.status(400).json({ error: { message: '无效的数字人任务' } });
+  }
+  try {
+    res.json(await proxyJson(`${digitalHumanApiBase}/digital-human/${path}`, {
+      method: 'POST', headers: digitalHumanHeaders(), body: JSON.stringify(payload),
+    }));
+  } catch (error) {
+    res.status(error.status || 500).json({ error: { message: error.message, code: error.code } });
+  }
+});
+
+app.get('/api/digital-human/tasks/:kind/:id', requireLogin, async (req, res) => {
+  if (!digitalHumanApiKey) return res.status(503).json({ error: { message: '数字人接口尚未配置' } });
+  const path = digitalHumanQueryPaths[req.params.kind];
+  if (!path || !/^[A-Za-z0-9_-]{4,180}$/.test(req.params.id)) {
+    return res.status(400).json({ error: { message: '无效的数字人任务 ID' } });
+  }
+  try {
+    res.json(await proxyJson(`${digitalHumanApiBase}/digital-human/${path}/${encodeURIComponent(req.params.id)}`, {
+      headers: { Authorization: `Bearer ${digitalHumanApiKey}` },
+    }));
+  } catch (error) {
+    res.status(error.status || 500).json({ error: { message: error.message, code: error.code } });
+  }
+});
+
+const editorModels = new Set(['gpt-5.5', 'gpt-5.6-sol']);
+
+app.post('/api/editor/generate', requireLogin, async (req, res) => {
+  if (!editorApiKey) return res.status(503).json({ error: { message: '发布编辑器模型尚未配置' } });
+  const {
+    model = 'gpt-5.5', platform = '小红书', language = '简体中文', tone = '专业可信',
+    objective = '产品推广', source = '', operation = 'generate', current = {},
+  } = req.body || {};
+  if (!editorModels.has(model)) return res.status(400).json({ error: { message: '不支持的文案模型' } });
+  if (!source.trim() && operation === 'generate') return res.status(400).json({ error: { message: '请填写产品或内容资料' } });
+  if (source.length > 12000) return res.status(400).json({ error: { message: '内容资料不能超过 12000 字' } });
+
+  const currentCopy = `标题：${current.title || ''}\n正文：${current.body || ''}\n标签：${current.hashtags || ''}`;
+  const operationInstruction = {
+    generate: '根据资料从零创作一篇可直接编辑发布的内容。',
+    shorten: '保留关键信息，将现有文案缩短约 30%，提高可读性。',
+    sell: '增强利益点、说服力和行动号召，但不要虚构事实或夸大承诺。',
+    retone: `将现有文案调整为“${tone}”语气，保持事实信息不变。`,
+  }[operation] || '优化现有文案。';
+
+  try {
+    const data = await proxyJson(`${editorApiBase}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${editorApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        temperature: 0.7,
+        max_tokens: 1800,
+        messages: [
+          { role: 'system', content: '你是资深品牌内容编辑。必须只返回合法 JSON，不要使用 Markdown 代码块。格式固定为 {"title":"","body":"","hashtags":[""]}。标题简洁，正文适合目标平台，hashtags 返回 3-8 个不带空格的标签。不得编造资料中不存在的参数、认证、折扣或功效。' },
+          { role: 'user', content: `平台：${platform}\n语言：${language}\n语气：${tone}\n目标：${objective}\n任务：${operationInstruction}\n资料：${source || '无新增资料'}\n${operation === 'generate' ? '' : `现有文案：\n${currentCopy}`}` },
+        ],
+      }),
+    });
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('文案模型未返回内容');
+    res.json({ content, model: data.model || model, usage: data.usage || null });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: { message: error.message, code: error.code } });
+  }
+});
+
+app.post('/api/face-reading', requireLogin, async (req, res) => {
+  if (!creativeApiKey) return res.status(503).json({ error: { message: 'AI 看相模型尚未配置' } });
+  const { image, focus = '综合解读' } = req.body || {};
+  if (!/^data:image\/(png|jpeg|webp);base64,/i.test(String(image || ''))) {
+    return res.status(400).json({ error: { message: '请上传 PNG、JPG 或 WEBP 人像照片' } });
+  }
+  if (String(image).length > 14 * 1024 * 1024) return res.status(400).json({ error: { message: '照片不能超过 10MB' } });
+
+  try {
+    const data = await proxyJson(`${creativeApiBase}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${creativeApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'deepseek-v4-flash-vision-exp',
+        stream: false,
+        temperature: 0.7,
+        max_tokens: 1600,
+        messages: [
+          { role: 'system', content: '你是一位传统面相文化讲解者，所有内容仅供文化娱乐。只能描述照片中直接可见的非敏感外观特点，并结合传统文化象征给出温和、非确定性的解读。不得推断或诊断健康、疾病、种族、宗教、性取向、政治倾向、犯罪倾向、智力或真实人格。必须只返回合法 JSON，不使用 Markdown。格式：{"summary":"","observations":[{"label":"","text":""}],"suggestions":[""],"closing":""}。observations 生成 4 项，suggestions 生成 3 项。' },
+          { role: 'user', content: [
+            { type: 'text', text: `解读侧重：${focus}。请使用简体中文，明确注明是传统文化娱乐解读，不作事实判断。` },
+            { type: 'image_url', image_url: { url: image } },
+          ] },
+        ],
+      }),
+    });
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('视觉模型未返回解读内容');
+    res.json({ content, model: data.model || 'deepseek-v4-flash-vision-exp', usage: data.usage || null });
+  } catch (error) {
+    res.status(error.status || 500).json({ error: { message: error.message, code: error.code } });
+  }
+});
+
+app.post('/api/ppt/generate', requireLogin, async (req, res) => {
+  if (!creativeApiKey) return res.status(503).json({ error: { message: 'AI PPT 模型尚未配置' } });
+  const {
+    topic = '', audience = '普通受众', objective = '清晰介绍主题', style = '商务简洁',
+    language = '简体中文', slideCount = 8, notes = '', model = 'gpt-5.5',
+  } = req.body || {};
+  if (!topic.trim()) return res.status(400).json({ error: { message: '请填写演示主题' } });
+  if (!editorModels.has(model)) return res.status(400).json({ error: { message: '不支持的 PPT 文案模型' } });
+  const count = Math.min(Math.max(Number(slideCount) || 8, 4), 20);
+
+  try {
+    const data = await proxyJson(`${creativeApiBase}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${creativeApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model, stream: false, temperature: 0.65, max_tokens: 5000,
+        messages: [
+          { role: 'system', content: '你是资深演示文稿策划师。必须只返回合法 JSON，不使用 Markdown 代码块。格式：{"title":"","subtitle":"","slides":[{"title":"","points":[""],"speakerNotes":"","visual":""}]}。首页也包含在 slides 中；每页 2-5 个简洁要点，避免长段落；visual 是适合该页的图片或图表建议；speakerNotes 是演讲备注。不得虚构数据、客户案例或研究来源。' },
+          { role: 'user', content: `请生成 ${count} 页演示文稿。\n主题：${topic.trim()}\n受众：${audience}\n目标：${objective}\n风格：${style}\n语言：${language}\n补充资料：${notes || '无'}\n请确保 slides 数量正好为 ${count}。` },
+        ],
+      }),
+    });
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('PPT 模型未返回内容');
+    res.json({ content, model: data.model || model, usage: data.usage || null });
   } catch (error) {
     res.status(error.status || 500).json({ error: { message: error.message, code: error.code } });
   }
