@@ -38,8 +38,11 @@ const routeNames = Object.fromEntries(Object.entries(routeMap).map(([name, route
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const asset = (path) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
+const onlineHosts = new Set(['kylinglory.com', 'www.kylinglory.com']);
 const apiOrigin = import.meta.env.VITE_API_ORIGIN || (
-  location.hostname.endsWith('github.io') ? 'https://api.kylinglory.com' : ''
+  onlineHosts.has(location.hostname) || location.hostname.endsWith('.github.io')
+    ? 'https://api.kylinglory.com'
+    : ''
 );
 const apiUrl = (path) => `${apiOrigin}${path}`;
 const apiUnavailableMessage = '线上页面尚未部署生图后端，暂时无法生成图片。';
