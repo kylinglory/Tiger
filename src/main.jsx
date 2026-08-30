@@ -87,6 +87,7 @@ function App() {
   const [faceConfigured, setFaceConfigured] = useState(false);
   const [pptConfigured, setPptConfigured] = useState(false);
   const [authRequired, setAuthRequired] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [authToken, setAuthToken] = useState(() => localStorage.getItem(authStorageKey) || '');
   const [authUser, setAuthUser] = useState('');
   const [loginOpen, setLoginOpen] = useState(false);
@@ -95,22 +96,28 @@ function App() {
   const inputRef = useRef(null);
 
   useEffect(() => {
-    fetch(apiUrl('/api/health')).then(readApiResponse).then((d) => {
-      setConfigured(d.configured);
-      setVideoConfigured(Boolean(d.videoConfigured));
-      setParseConfigured(Boolean(d.parseConfigured));
-      setDigitalHumanConfigured(Boolean(d.digitalHumanConfigured));
-      setEditorConfigured(Boolean(d.editorConfigured));
-      setFaceConfigured(Boolean(d.faceConfigured));
-      setPptConfigured(Boolean(d.pptConfigured));
-      setAuthRequired(Boolean(d.authRequired));
-      if (d.authRequired) {
-        fetch(apiUrl('/api/me'), { headers: authHeader(authToken) })
-          .then(readApiResponse)
-          .then((me) => { setAuthUser(me.username || '已登录'); if (!authToken) setAuthToken('cookie-session'); })
-          .catch(() => { localStorage.removeItem(authStorageKey); setAuthToken(''); });
-      }
-    }).catch(() => {});
+    (async () => {
+      try {
+        const health = await fetch(apiUrl('/api/health')).then(readApiResponse);
+        setConfigured(health.configured);
+        setVideoConfigured(Boolean(health.videoConfigured));
+        setParseConfigured(Boolean(health.parseConfigured));
+        setDigitalHumanConfigured(Boolean(health.digitalHumanConfigured));
+        setEditorConfigured(Boolean(health.editorConfigured));
+        setFaceConfigured(Boolean(health.faceConfigured));
+        setPptConfigured(Boolean(health.pptConfigured));
+        setAuthRequired(Boolean(health.authRequired));
+        if (health.authRequired) {
+          try {
+            const me = await fetch(apiUrl('/api/me'), { headers: authHeader(authToken) }).then(readApiResponse);
+            setAuthUser(me.username || '已登录');
+            if (!authToken) setAuthToken('cookie-session');
+          } catch {
+            localStorage.removeItem(authStorageKey); setAuthToken('');
+          }
+        }
+      } finally { setAuthChecked(true); }
+    })();
     const saved = localStorage.getItem('xiaojishuo-draft');
     if (saved) {
       try {
@@ -226,6 +233,9 @@ function App() {
     } else setNotice(`${name} 功能入口已保留`);
   }
 
+  if (!authChecked) return <LoginLoading />;
+  if (authRequired && !authToken) return <LoginGate form={loginForm} setForm={setLoginForm} status={loginStatus} notice={notice} onSubmit={login} />;
+
   return <div className="app-shell">
     <header className="topbar">
       <button className="icon-button mobile-only" onClick={() => setMobileNav(true)} aria-label="打开导航"><Menu size={20} /></button>
@@ -324,6 +334,30 @@ function App() {
       </button>
     </form></div>}
   </div>;
+}
+
+function LoginLoading() {
+  return <div className="login-loading"><img src={asset('/assets/logo.png')} alt="Kylin Glory Design" /><LoaderCircle className="spin" /></div>;
+}
+
+function LoginGate({ form, setForm, status, notice, onSubmit }) {
+  return <main className="login-gate">
+    <section className="login-showcase">
+      <img className="login-showcase-bg" src={asset('/assets/detail-hero.webp')} alt="AI 电商设计作品" />
+      <div className="login-showcase-shade" />
+      <img className="login-brand" src={asset('/assets/logo.png')} alt="Kylin Glory Design" />
+      <div className="login-message"><span>详情页 · 底图 · 海外电商</span><h1>一键生成全套<br />电商视觉内容</h1><p>AI 驱动的电商设计工作台。上传产品图，快速产出完整的营销素材。</p></div>
+      <div className="login-scene-strip"><img src={asset('/assets/scene-commute.webp')} alt="通勤场景" /><img src={asset('/assets/scene-sport.webp')} alt="运动场景" /><img src={asset('/assets/scene-business.webp')} alt="商务场景" /></div>
+    </section>
+    <section className="login-form-side"><form className="login-page-form" onSubmit={onSubmit}>
+      <div className="login-form-heading"><span>Kylin Glory Design</span><h2>欢迎回来</h2><p>登录后进入 AI 创作工作台</p></div>
+      {notice && <div className="login-page-error">{notice}</div>}
+      <label><span>账号</span><div><UserRound size={17} /><input autoFocus value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} placeholder="请输入账号" autoComplete="username" /></div></label>
+      <label><span>密码</span><div><ShieldCheck size={17} /><input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder="请输入密码" autoComplete="current-password" /></div></label>
+      <button className="login-submit" disabled={status === 'running' || !form.username || !form.password}>{status === 'running' ? <LoaderCircle className="spin" /> : <LogIn size={17} />}{status === 'running' ? '登录中…' : '登录'}</button>
+      <div className="login-security"><ShieldCheck size={14} /><span>仅授权账号可访问全部功能</span></div>
+    </form><p className="login-copyright">Kylin Glory Design - the Best for You</p></section>
+  </main>;
 }
 
 const baseScenes = [
