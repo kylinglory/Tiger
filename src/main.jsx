@@ -342,21 +342,29 @@ function LoginLoading() {
 
 function LoginGate({ form, setForm, status, notice, onSubmit }) {
   return <main className="login-gate">
-    <section className="login-showcase">
-      <img className="login-showcase-bg" src={asset('/assets/detail-hero.webp')} alt="AI 电商设计作品" />
-      <div className="login-showcase-shade" />
-      <img className="login-brand" src={asset('/assets/logo.png')} alt="Kylin Glory Design" />
-      <div className="login-message"><span>详情页 · 底图 · 海外电商</span><h1>一键生成全套<br />电商视觉内容</h1><p>AI 驱动的电商设计工作台。上传产品图，快速产出完整的营销素材。</p></div>
-      <div className="login-scene-strip"><img src={asset('/assets/scene-commute.webp')} alt="通勤场景" /><img src={asset('/assets/scene-sport.webp')} alt="运动场景" /><img src={asset('/assets/scene-business.webp')} alt="商务场景" /></div>
+    <div className="login-app-preview" aria-hidden="true">
+      <header><img src={asset('/assets/logo.png')} alt="" /><i /><i /><i /><span /></header>
+      <aside>{Array.from({ length: 8 }, (_, index) => <i key={index} />)}</aside>
+      <section><i /><i /><i /></section>
+    </div>
+    <div className="login-backdrop" />
+    <section className="login-dialog">
+      <div className="login-showcase">
+        <img className="login-showcase-bg" src={asset('/assets/detail-hero.webp')} alt="AI 电商设计作品" />
+        <div className="login-showcase-shade" />
+        <img className="login-brand" src={asset('/assets/logo.png')} alt="Kylin Glory Design" />
+        <div className="login-message"><h1>一键生成全套</h1><strong>详情页 · 底图 · 海外电商</strong><p>AI 驱动的电商设计工作台。上传一张产品图，快速产出完整的营销素材。</p></div>
+        <p className="login-invite">Kylin Glory Design · the Best for You</p>
+      </div>
+      <div className="login-form-side"><form className="login-page-form" onSubmit={onSubmit}>
+        <div className="login-form-heading"><h2>登录</h2><p>仅限授权账号访问</p></div>
+        {notice && <div className="login-page-error">{notice}</div>}
+        <label><span>账号</span><div><UserRound size={18} /><input autoFocus value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} placeholder="请输入用户名" autoComplete="username" /></div></label>
+        <label><span>密码</span><div><ShieldCheck size={18} /><input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder="请输入密码" autoComplete="current-password" /></div></label>
+        <button className="login-submit" disabled={status === 'running' || !form.username || !form.password}>{status === 'running' ? <LoaderCircle className="spin" /> : <LogIn size={17} />}{status === 'running' ? '登录中…' : '登录'}</button>
+        <div className="login-security"><ShieldCheck size={14} /><span>登录后可使用全部创作功能</span></div>
+      </form></div>
     </section>
-    <section className="login-form-side"><form className="login-page-form" onSubmit={onSubmit}>
-      <div className="login-form-heading"><span>Kylin Glory Design</span><h2>欢迎回来</h2><p>登录后进入 AI 创作工作台</p></div>
-      {notice && <div className="login-page-error">{notice}</div>}
-      <label><span>账号</span><div><UserRound size={17} /><input autoFocus value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} placeholder="请输入账号" autoComplete="username" /></div></label>
-      <label><span>密码</span><div><ShieldCheck size={17} /><input type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} placeholder="请输入密码" autoComplete="current-password" /></div></label>
-      <button className="login-submit" disabled={status === 'running' || !form.username || !form.password}>{status === 'running' ? <LoaderCircle className="spin" /> : <LogIn size={17} />}{status === 'running' ? '登录中…' : '登录'}</button>
-      <div className="login-security"><ShieldCheck size={14} /><span>仅授权账号可访问全部功能</span></div>
-    </form><p className="login-copyright">Kylin Glory Design - the Best for You</p></section>
   </main>;
 }
 
