@@ -86,7 +86,7 @@ function App() {
   const [editorConfigured, setEditorConfigured] = useState(false);
   const [faceConfigured, setFaceConfigured] = useState(false);
   const [pptConfigured, setPptConfigured] = useState(false);
-  const [authRequired, setAuthRequired] = useState(false);
+  const [authRequired] = useState(true);
   const [authChecked, setAuthChecked] = useState(false);
   const [authToken, setAuthToken] = useState(() => localStorage.getItem(authStorageKey) || '');
   const [authUser, setAuthUser] = useState('');
@@ -106,16 +106,16 @@ function App() {
         setEditorConfigured(Boolean(health.editorConfigured));
         setFaceConfigured(Boolean(health.faceConfigured));
         setPptConfigured(Boolean(health.pptConfigured));
-        setAuthRequired(Boolean(health.authRequired));
-        if (health.authRequired) {
-          try {
-            const me = await fetch(apiUrl('/api/me'), { headers: authHeader(authToken) }).then(readApiResponse);
-            setAuthUser(me.username || '已登录');
-            if (!authToken) setAuthToken('cookie-session');
-          } catch {
-            localStorage.removeItem(authStorageKey); setAuthToken('');
-          }
+        if (!health.authRequired) throw new Error('登录保护尚未在后端启用');
+        if (authToken) {
+          const me = await fetch(apiUrl('/api/me'), { headers: authHeader(authToken) }).then(readApiResponse);
+          if (!me.authRequired || !me.username) throw new Error('登录状态无效');
+          setAuthUser(me.username);
         }
+      } catch {
+        localStorage.removeItem(authStorageKey);
+        setAuthToken('');
+        setAuthUser('');
       } finally { setAuthChecked(true); }
     })();
     const saved = localStorage.getItem('xiaojishuo-draft');
@@ -201,9 +201,12 @@ function App() {
         body: JSON.stringify(loginForm),
       });
       const body = await readApiResponse(response);
+      if (!body.token?.includes('.')) throw new Error('登录凭证无效，请检查后端登录配置');
+      const me = await fetch(apiUrl('/api/me'), { headers: authHeader(body.token) }).then(readApiResponse);
+      if (!me.authRequired || !me.username) throw new Error('登录验证失败');
       localStorage.setItem(authStorageKey, body.token);
       setAuthToken(body.token);
-      setAuthUser(body.username || loginForm.username);
+      setAuthUser(me.username);
       setLoginForm({ username: '', password: '' });
       setLoginOpen(false);
       setLoginStatus('done');
