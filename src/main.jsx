@@ -8,6 +8,7 @@ import {
   X, Zap,
 } from 'lucide-react';
 import './styles.css';
+import './redesign.css';
 
 const navGroups = [
   { label: '创作工作台', items: [
@@ -245,9 +246,9 @@ function App() {
   return <div className="app-shell">
     <header className="topbar">
       <button className="icon-button mobile-only" onClick={() => setMobileNav(true)} aria-label="打开导航"><Menu size={20} /></button>
-      <img className="logo" src={asset('/assets/logo.png')} alt="小鸡说Ai" />
+      <div className="brand-lockup"><img className="logo" src={asset('/assets/logo.png')} alt="Kylin Glory Design" /><span>AI DESIGN STUDIO</span></div>
       <button className="new-task"><Plus size={17} /> 新建任务</button>
-      <span className="task-name">当前：{activeTool.replace('商品', '')} #1 · {new Date().toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' }).replace('/', '-')} 15:05</span>
+      <span className="task-name"><small>WORKSPACE</small><b>{activeTool}</b><i>#01</i></span>
       <span className={`api-state ${configured ? 'ready' : ''}`}>{configured ? '接口已连接' : '待配置密钥'}</span>
       <button className="login" onClick={() => authToken ? logout() : setLoginOpen(true)} title={authToken ? `当前账号：${authUser || '已登录'}，点击退出` : '登录'}>
         <LogIn size={15} /> {authToken ? '已登录' : '登录'}
@@ -256,6 +257,7 @@ function App() {
 
     <aside className={`sidebar ${mobileNav ? 'open' : ''}`}>
       <button className="icon-button close-nav" onClick={() => setMobileNav(false)} aria-label="关闭导航"><X /></button>
+      <div className="sidebar-heading"><span>创作中心</span><small>12 TOOLS</small></div>
       {navGroups.map((group) => <div className="nav-group" key={group.label}>
         <div className="nav-label">{group.label}</div>
         {group.items.map(([Icon, name, badge]) => <button key={name} className={`nav-item ${name === activeTool ? 'active' : ''}`} onClick={() => openTool(name)}>
