@@ -13,7 +13,7 @@ import './redesign.css';
 const navGroups = [
   { label: '创作工作台', items: [
     [Image, '商品底图'], [FileText, '商品详情页'], [Globe2, '海外电商'],
-    [Megaphone, '设计海报', 'NEW'], [Search, '商品解析', 'NEW'],
+    [Megaphone, '设计海报', 'NEW'], [BarChart3, '爆款IP分析', 'NEW'], [Search, '商品解析', 'NEW'],
     [MonitorPlay, '爆款视频', 'BETA'], [UserRound, '数字人', 'BETA'],
     [Archive, '发布编辑器', 'NEW'],
   ]},
@@ -34,7 +34,7 @@ const platformOptions = {
   pageType: ['普通A+', '高级A+', '品牌故事'],
 };
 
-const routeMap = { 商品底图: 'base', 商品详情页: 'detail', 海外电商: 'overseas', 设计海报: 'poster', 商品解析: 'parse', 爆款视频: 'video', 数字人: 'digital-human', 发布编辑器: 'editor', 'AI 看相': 'face', 'AI PPT': 'ppt', 个人中心: 'account', 购买点数: 'credits', 草稿箱: 'drafts' };
+const routeMap = { 商品底图: 'base', 商品详情页: 'detail', 海外电商: 'overseas', 设计海报: 'poster', 爆款IP分析: 'ip-analysis', 商品解析: 'parse', 爆款视频: 'video', 数字人: 'digital-human', 发布编辑器: 'editor', 'AI 看相': 'face', 'AI PPT': 'ppt', 个人中心: 'account', 购买点数: 'credits', 草稿箱: 'drafts' };
 const routeNames = Object.fromEntries(Object.entries(routeMap).map(([name, route]) => [route, name]));
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,6 +64,7 @@ async function readApiResponse(response) {
 const draftDefinitions = [
   ['xiaojishuo-draft', '商品详情页', 'detail'], ['xiaojishuo-base-draft', '商品底图', 'base'],
   ['xiaojishuo-overseas-draft', '海外电商', 'overseas'], ['xiaojishuo-poster-draft', '设计海报', 'poster'],
+  ['xiaojishuo-ip-analysis-draft', '爆款IP分析', 'ip-analysis'],
   ['xiaojishuo-video-draft', '爆款视频', 'video'], ['xiaojishuo-parse-draft', '商品解析', 'parse'],
   ['xiaojishuo-digital-human-draft', '数字人', 'digital-human'], ['xiaojishuo-editor-draft', '发布编辑器', 'editor'],
   ['xiaojishuo-ppt-draft', 'AI PPT', 'ppt'],
@@ -86,6 +87,7 @@ function App() {
   const [configured, setConfigured] = useState(false);
   const [videoConfigured, setVideoConfigured] = useState(false);
   const [parseConfigured, setParseConfigured] = useState(false);
+  const [ipAnalysisConfigured, setIpAnalysisConfigured] = useState(false);
   const [digitalHumanConfigured, setDigitalHumanConfigured] = useState(false);
   const [editorConfigured, setEditorConfigured] = useState(false);
   const [faceConfigured, setFaceConfigured] = useState(false);
@@ -106,6 +108,7 @@ function App() {
         setConfigured(health.configured);
         setVideoConfigured(Boolean(health.videoConfigured));
         setParseConfigured(Boolean(health.parseConfigured));
+        setIpAnalysisConfigured(Boolean(health.ipAnalysisConfigured ?? (health.parseConfigured && health.editorConfigured)));
         setDigitalHumanConfigured(Boolean(health.digitalHumanConfigured));
         setEditorConfigured(Boolean(health.editorConfigured));
         setFaceConfigured(Boolean(health.faceConfigured));
@@ -257,7 +260,7 @@ function App() {
 
     <aside className={`sidebar ${mobileNav ? 'open' : ''}`}>
       <button className="icon-button close-nav" onClick={() => setMobileNav(false)} aria-label="关闭导航"><X /></button>
-      <div className="sidebar-heading"><span>创作中心</span><small>12 TOOLS</small></div>
+      <div className="sidebar-heading"><span>创作中心</span><small>13 TOOLS</small></div>
       {navGroups.map((group) => <div className="nav-group" key={group.label}>
         <div className="nav-label">{group.label}</div>
         {group.items.map(([Icon, name, badge]) => <button key={name} className={`nav-item ${name === activeTool ? 'active' : ''}`} onClick={() => openTool(name)}>
@@ -324,7 +327,7 @@ function App() {
         <div className="preview-heading"><div className="eyebrow"><Sparkles size={15} />多模块 · 一键生成 · 商业可用</div><h1>商品详情页</h1><p>上传商品图，AI 即刻生成 <b>符合多电商平台规范</b> 的专业详情页。</p></div>
         {generated.length ? <div className="generated-grid">{generated.map((url, i) => <article key={url}><img src={url} alt={`AI 生成详情图 ${i + 1}`} /><a href={url} target="_blank" rel="noreferrer">查看原图</a></article>)}</div> : <ProductPreview />}
       </section>
-    </main> : activeTool === '爆款视频' ? <VideoWorkspace configured={videoConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === '商品解析' ? <ParseWorkspace configured={parseConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === '数字人' ? <DigitalHumanWorkspace configured={digitalHumanConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === '发布编辑器' ? <PublishEditor configured={editorConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === 'AI 看相' ? <FaceReading configured={faceConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === 'AI PPT' ? <AiPpt configured={pptConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === '个人中心' ? <AccountCenter authUser={authUser} authRequired={authRequired} configured={{ image: configured, video: videoConfigured, parse: parseConfigured, human: digitalHumanConfigured, editor: editorConfigured, face: faceConfigured, ppt: pptConfigured }} /> : activeTool === '购买点数' ? <CreditsPage /> : activeTool === '草稿箱' ? <DraftsPage setNotice={setNotice} /> : <ToolWorkspace tool={activeTool} configured={configured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} />}
+    </main> : activeTool === '爆款IP分析' ? <IpAnalysisWorkspace configured={ipAnalysisConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === '爆款视频' ? <VideoWorkspace configured={videoConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === '商品解析' ? <ParseWorkspace configured={parseConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === '数字人' ? <DigitalHumanWorkspace configured={digitalHumanConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === '发布编辑器' ? <PublishEditor configured={editorConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === 'AI 看相' ? <FaceReading configured={faceConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === 'AI PPT' ? <AiPpt configured={pptConfigured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} /> : activeTool === '个人中心' ? <AccountCenter authUser={authUser} authRequired={authRequired} configured={{ image: configured, video: videoConfigured, parse: parseConfigured, ip: ipAnalysisConfigured, human: digitalHumanConfigured, editor: editorConfigured, face: faceConfigured, ppt: pptConfigured }} /> : activeTool === '购买点数' ? <CreditsPage /> : activeTool === '草稿箱' ? <DraftsPage setNotice={setNotice} /> : <ToolWorkspace tool={activeTool} configured={configured} authRequired={authRequired} authToken={authToken} onLoginRequired={() => setLoginOpen(true)} setNotice={setNotice} />}
 
     {notice && <div className={`toast ${status === 'error' ? 'error' : ''}`}><span>{notice}</span><button onClick={() => setNotice('')} aria-label="关闭提示"><X size={15} /></button></div>}
     {linkOpen && <div className="modal-backdrop" onClick={() => setLinkOpen(false)}><div className="modal" onClick={(e) => e.stopPropagation()}>
@@ -431,6 +434,66 @@ async function submitAndPoll({ prompt, images, aspectRatio, count, authToken, on
     if (urls.length === tasks.length) return urls;
   }
   throw new Error('生成时间较长，请稍后重试');
+}
+
+function IpAnalysisWorkspace({ configured, authRequired, authToken, onLoginRequired, setNotice }) {
+  const [platform, setPlatform] = useState('douyin');
+  const [url, setUrl] = useState('');
+  const [status, setStatus] = useState('idle');
+  const [report, setReport] = useState(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('xiaojishuo-ip-analysis-draft');
+    if (!saved) return;
+    try { const data = JSON.parse(saved); setPlatform(data.platform || 'douyin'); setUrl(data.url || ''); if (data.report) setReport(data.report); } catch { /* ignore stale draft */ }
+  }, []);
+  useEffect(() => { localStorage.setItem('xiaojishuo-ip-analysis-draft', JSON.stringify({ platform, url, report })); }, [platform, url, report]);
+
+  async function analyze() {
+    if (!configured) return setNotice('爆款 IP 分析模型尚未配置');
+    if (authRequired && !authToken) { onLoginRequired(); return setNotice('请先登录后再分析账号'); }
+    if (!url.trim()) return setNotice('请粘贴账号主页链接');
+    setStatus('running'); setReport(null); setNotice('正在解析主页与热门作品…');
+    try {
+      const response = await fetch(apiUrl('/api/ip-analysis'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader(authToken) },
+        body: JSON.stringify({ platform, url: url.trim() }),
+      });
+      const body = await readApiResponse(response);
+      setNotice('正在整理爆款规律与口播脚本…');
+      setReport(parseJsonModelContent(body.content)); setStatus('done'); setNotice('爆款 IP 分析报告已生成');
+    } catch (error) { setStatus('error'); setNotice(error.message); }
+  }
+
+  const running = status === 'running';
+  const platformName = platform === 'douyin' ? '抖音' : '视频号';
+  return <main className="workspace tool-workspace ip-workspace">
+    <section className="control-panel">
+      <div className="panel-section ip-intro"><span>账号分析</span><h2>爆款内容分析</h2><p>输入账号主页，提炼内容规律并生成标题和口播。</p></div>
+      <div className="panel-section"><h2>分析平台</h2><div className="ip-platforms" role="tablist" aria-label="选择分析平台">{[['douyin','抖音'],['wechat-channels','视频号']].map(([value, label]) => <button role="tab" aria-selected={platform === value} key={value} className={platform === value ? 'selected' : ''} onClick={() => { setPlatform(value); setReport(null); }}>{label}</button>)}</div></div>
+      <div className="panel-section"><h2>分析流程</h2><div className="ip-steps">{[['01','主页链接'],['02','热门作品'],['03','口播报告']].map(([number, label], index) => <div className={running && index < 2 ? 'active' : report ? 'done' : ''} key={number}><span>{number}</span><strong>{label}</strong></div>)}</div></div>
+      <div className="panel-section brief-section"><h2>{platformName}账号主页链接</h2><textarea className="ip-source" value={url} onChange={(event) => setUrl(event.target.value)} placeholder={`粘贴${platformName}账号主页链接，自动分析热门作品…`} /></div>
+      <div className="generate-wrap"><button className="generate" disabled={running || !url.trim()} onClick={analyze}>{running ? <LoaderCircle className="spin" /> : <BarChart3 />}{running ? '正在生成报告…' : '生成报告'}</button><p>主页解析 · 爆款规律 · 标题与口播脚本</p></div>
+    </section>
+    <section className="preview-panel ip-preview"><div className="preview-heading"><div className="eyebrow"><BarChart3 size={15} />Content intelligence</div><h1>爆款 IP 分析</h1><p>从真实热门内容中提炼可复用的选题、开场与叙事结构。</p></div>
+      {report ? <IpAnalysisReport report={report} platform={platformName} setNotice={setNotice} /> : <ModuleShowcase image="/assets/base-night.webp" icon={BarChart3} kicker={`${platformName} content lab`} title={running ? '正在拆解热门内容' : '让内容规律变得清晰'} detail={running ? '正在完成主页解析、热门作品筛选和口播策略整理。' : '输入主页链接后，完整分析报告会在这里生成。'} />}
+    </section>
+  </main>;
+}
+
+function IpAnalysisReport({ report, platform, setNotice }) {
+  const profile = report.profile || {};
+  const metrics = report.metrics || {};
+  const topWorks = Array.isArray(report.topWorks) ? report.topWorks : [];
+  const titles = Array.isArray(report.titleIdeas) ? report.titleIdeas : [];
+  const scripts = Array.isArray(report.scripts) ? report.scripts : [];
+  return <div className="ip-report">
+    <div className="ip-report-bar"><span>{platform} · 分析报告</span><button onClick={() => { navigator.clipboard.writeText(JSON.stringify(report, null, 2)); setNotice('分析报告已复制'); }}><Copy size={14} />复制报告</button></div>
+    <section className="ip-profile"><div><span>账号定位</span><h2>{profile.name || '账号分析'}</h2><p>{profile.positioning || report.summary}</p></div><dl><div><dt>目标受众</dt><dd>{profile.audience || '未提供'}</dd></div><div><dt>分析作品</dt><dd>{metrics.worksAnalyzed ?? '未提供'}</dd></div><div><dt>互动表现</dt><dd>{metrics.engagement || '未提供'}</dd></div></dl>{profile.contentPillars?.length > 0 && <div className="ip-pillars">{profile.contentPillars.map((item) => <span key={item}>{item}</span>)}</div>}</section>
+    {topWorks.length > 0 && <section className="ip-report-section"><div className="ip-section-title"><span>01</span><h2>热门作品规律</h2></div><div className="ip-work-list">{topWorks.map((item, index) => <article key={`${item.title}-${index}`}><small>TOP {index + 1}</small><h3>{item.title}</h3><p>{item.reason}</p><div><span>开场</span>{item.hook}</div><div><span>结构</span>{item.structure}</div></article>)}</div></section>}
+    {titles.length > 0 && <section className="ip-report-section"><div className="ip-section-title"><span>02</span><h2>标题建议</h2></div><div className="ip-title-list">{titles.map((item, index) => <div key={`${item}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span><p>{item}</p></div>)}</div></section>}
+    {scripts.length > 0 && <section className="ip-report-section"><div className="ip-section-title"><span>03</span><h2>口播脚本</h2></div><div className="ip-script-list">{scripts.map((item, index) => <article key={`${item.title}-${index}`}><div><span>脚本 {index + 1}</span><small>{item.duration}</small></div><h3>{item.title}</h3><p>{item.content}</p></article>)}</div></section>}
+  </div>;
 }
 
 const videoModelOptions = [
@@ -998,7 +1061,7 @@ function AiPpt({ configured, authRequired, authToken, onLoginRequired, setNotice
 
 function AccountCenter({ authUser, authRequired, configured }) {
   const services = [
-    ['图片生成', configured.image], ['视频生成', configured.video], ['商品解析', configured.parse],
+    ['图片生成', configured.image], ['视频生成', configured.video], ['商品解析', configured.parse], ['爆款 IP 分析', configured.ip],
     ['数字人', configured.human], ['发布编辑器', configured.editor], ['AI 看相', configured.face], ['AI PPT', configured.ppt],
   ];
   return <main className="simple-page"><div className="simple-page-inner"><div className="account-header"><div className="account-avatar"><UserRound size={34} /></div><div><span>个人中心</span><h1>{authUser || (authRequired ? '管理员账号' : '本地开发账号')}</h1><p>{authRequired ? '账号已受登录保护' : '本地开发模式，正式部署后启用登录保护'}</p></div></div>

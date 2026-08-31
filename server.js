@@ -216,6 +216,7 @@ app.get('/api/health', (_req, res) => {
     parseConfigured: Boolean(parseApiKey),
     digitalHumanConfigured: Boolean(digitalHumanApiKey),
     editorConfigured: Boolean(editorApiKey),
+    ipAnalysisConfigured: Boolean(parseApiKey && creativeApiKey),
     faceConfigured: Boolean(creativeApiKey),
     pptConfigured: Boolean(creativeApiKey),
     model: 'gpt-image-2',
@@ -383,6 +384,37 @@ app.post('/api/parse', requireLogin, async (req, res) => {
   } catch (error) {
     const busy = [429, 502, 503].includes(error.status);
     res.status(error.status || 500).json({ error: { message: busy ? `${platform === 'amazon' ? '亚马逊' : '商品'}解析服务暂时繁忙，已自动重试 3 次，请稍后再试` : error.message, code: error.code } });
+  }
+});
+
+app.post('/api/ip-analysis', requireLogin, async (req, res) => {
+  if (!parseApiKey || !creativeApiKey) return res.status(503).json({ error: { message: '爆款 IP 分析接口尚未配置' } });
+  const { platform = 'douyin', url = '' } = req.body || {};
+  if (!['douyin', 'wechat-channels'].includes(platform)) return res.status(400).json({ error: { message: '仅支持抖音和视频号分析' } });
+  if (!url.trim()) return res.status(400).json({ error: { message: '请粘贴账号主页链接' } });
+
+  try {
+    const parsed = await proxyJsonWithRetry(`${parseApiBase}/parse/${platform}`, {
+      method: 'POST', headers: parseAuthHeaders(), body: JSON.stringify({ url: url.trim() }),
+    });
+    const source = JSON.stringify(parsed).slice(0, 26000);
+    const data = await proxyJson(`${creativeApiBase}/chat/completions`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${creativeApiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'gpt-5.5', stream: false, temperature: 0.55, max_tokens: 4200,
+        messages: [
+          { role: 'system', content: '你是短视频账号内容策略分析师。只能依据解析数据分析，不得虚构粉丝数、播放量、互动量或作品事实；缺失数据写“未提供”。必须只返回合法 JSON，不使用 Markdown。格式固定为 {"profile":{"name":"","positioning":"","audience":"","contentPillars":[""]},"metrics":{"worksAnalyzed":0,"engagement":"","topPattern":""},"topWorks":[{"title":"","reason":"","hook":"","structure":""}],"titleIdeas":[""],"scripts":[{"title":"","duration":"","content":""}],"summary":""}。topWorks 最多 5 条，titleIdeas 生成 8 条，scripts 生成 3 条可直接拍摄的中文口播脚本。' },
+          { role: 'user', content: `平台：${platform === 'douyin' ? '抖音' : '视频号'}\n账号主页：${url.trim()}\n以下是解析接口返回的数据：\n${source}` },
+        ],
+      }),
+    });
+    const content = data.choices?.[0]?.message?.content;
+    if (!content) throw new Error('内容模型未返回分析报告');
+    res.json({ content, platform, sourceCount: Array.isArray(parsed?.data) ? parsed.data.length : null, usage: data.usage || null });
+  } catch (error) {
+    const busy = [429, 502, 503].includes(error.status);
+    res.status(error.status || 500).json({ error: { message: busy ? '账号分析服务暂时繁忙，请稍后再试' : error.message, code: error.code } });
   }
 });
 
