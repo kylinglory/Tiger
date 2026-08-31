@@ -531,7 +531,7 @@ function VideoWorkspace({ configured, authRequired, authToken, onLoginRequired, 
     </section>
 
     <section className="preview-panel video-preview"><div className="preview-heading"><div className="eyebrow"><MonitorPlay size={15} />AI 视频生成</div><h1>爆款视频</h1><p>用商品图和创意描述生成适合投放的产品短片。</p></div>
-      {videoUrl ? <div className="video-result"><video src={videoUrl} controls playsInline /><div><span>{selectedModel.name} · {size}</span><a href={videoUrl} target="_blank" rel="noreferrer"><Download size={16} />打开并下载视频</a></div></div> : <div className="video-empty"><MonitorPlay size={46} /><strong>{isRunning ? '正在制作视频' : '等待生成'}</strong><span>{isRunning ? `当前进度 ${progress}%` : '选择模型、填写描述后开始生成'}</span>{isRunning && <div className="video-progress"><i style={{ width: `${progress}%` }} /></div>}</div>}
+      {videoUrl ? <div className="video-result"><video src={videoUrl} controls playsInline /><div><span>{selectedModel.name} · {size}</span><a href={videoUrl} target="_blank" rel="noreferrer"><Download size={16} />打开并下载视频</a></div></div> : <ModuleShowcase image="/assets/scene-sport.webp" icon={MonitorPlay} kicker="Cinematic motion" title={isRunning ? '正在制作视频' : '让产品进入镜头'} detail={isRunning ? `当前进度 ${progress}%` : '从静态产品图延展出有节奏、有质感的商业短片。'}>{isRunning && <div className="video-progress"><i style={{ width: `${progress}%` }} /></div>}</ModuleShowcase>}
     </section>
   </main>;
 }
@@ -599,7 +599,7 @@ function ParseWorkspace({ configured, authRequired, authToken, onLoginRequired, 
     </section>
 
     <section className="preview-panel parse-preview"><div className="preview-heading"><div className="eyebrow"><Search size={15} />跨平台商品数据</div><h1>商品解析</h1><p>提取 {selectedPlatform?.name} 的标题、图片、价格和商品描述。</p></div>
-      {result ? <ParseResult result={result} onCopy={() => { navigator.clipboard.writeText(JSON.stringify(result, null, 2)); setNotice('原始数据已复制'); }} /> : <div className="parse-empty"><Search size={43} /><strong>粘贴链接，一键提取</strong><span>解析结果会在这里按商品整理展示</span></div>}
+      {result ? <ParseResult result={result} onCopy={() => { navigator.clipboard.writeText(JSON.stringify(result, null, 2)); setNotice('原始数据已复制'); }} /> : <ModuleShowcase image="/assets/detail-hero.webp" icon={Search} kicker="Product intelligence" title="看见商品的全部信息" detail="一次提取标题、价格、卖点与图片，为下一步创作准备完整素材。" />}
     </section>
   </main>;
 }
@@ -772,7 +772,7 @@ function DigitalHumanWorkspace({ configured, authRequired, authToken, onLoginReq
     </section>
 
     <section className="preview-panel human-preview"><div className="preview-heading"><div className="eyebrow"><UserRound size={15} />Digital Human</div><h1>数字人口播</h1><p>使用专属形象与声音，生成自然同步的口播视频。</p></div>
-      {videoUrl ? <div className="video-result"><video src={videoUrl} controls playsInline /><div><span>数字人口播 · 已完成</span><a href={videoUrl} target="_blank" rel="noreferrer"><Download size={16} />打开并下载视频</a></div></div> : <div className="human-stage"><div className="human-avatar"><UserRound size={58} /></div><strong>{running ? stage : '等待生成'}</strong><span>{running ? `正在处理 ${Math.round(progress)}%` : '选择人物来源与驱动语音后开始'}</span>{running && <div className="video-progress"><i style={{ width: `${progress}%` }} /></div>}</div>}
+      {videoUrl ? <div className="video-result"><video src={videoUrl} controls playsInline /><div><span>数字人口播 · 已完成</span><a href={videoUrl} target="_blank" rel="noreferrer"><Download size={16} />打开并下载视频</a></div></div> : <ModuleShowcase image="/assets/scene-business.webp" icon={UserRound} kicker="Digital presenter" title={running ? stage : '品牌表达，自然出镜'} detail={running ? `正在处理 ${Math.round(progress)}%` : '用统一形象与声音，持续产出清晰自然的口播内容。'}>{running && <div className="video-progress"><i style={{ width: `${progress}%` }} /></div>}</ModuleShowcase>}
     </section>
   </main>;
 }
@@ -867,6 +867,7 @@ function PublishEditor({ configured, authRequired, authToken, onLoginRequired, s
 
     <section className="editor-preview"><div className="editor-preview-bar"><div><span>发布预览</span><strong>{platform}</strong></div><button onClick={() => mediaInputRef.current?.click()}><ImagePlus size={15} />添加素材</button><input ref={mediaInputRef} hidden type="file" accept="image/*,video/*" multiple onChange={(event) => addEditorMedia(event.target.files)} /></div>
       <article className="social-preview"><header><div className="brand-avatar">KG</div><div><strong>Kylin Glory Design</strong><span>刚刚 · {platform}</span></div><MoreHorizontal size={18} /></header>
+        {media.length === 0 && <div className="editor-showcase"><img src={asset('/assets/scene-commute.webp')} alt="产品内容发布示例" /><div><span>PRODUCT STORY</span><strong>从产品出发，完成一次有质感的发布。</strong></div></div>}
         {title && <h1>{title}</h1>}<p>{body || '生成或输入正文后，可在这里检查最终发布效果。'}</p>{tagList.length > 0 && <div className="social-tags">{tagList.map((tag) => <span key={tag}>#{tag}</span>)}</div>}
         {media.length > 0 && <div className={`editor-media media-${Math.min(media.length, 4)}`}>{media.map((item, index) => <div key={item.name + index}>{item.type.startsWith('video/') ? <video src={item.src} controls /> : <img src={item.src} alt={item.name} />}<button onClick={() => setMedia((current) => current.filter((_, i) => i !== index))} aria-label="移除素材"><X size={13} /></button></div>)}</div>}
         <footer><span>预览模式</span><span>{fullCopy.length} 字符</span></footer>
@@ -918,7 +919,7 @@ function FaceReading({ configured, authRequired, authToken, onLoginRequired, set
       <div className="generate-wrap"><button className="generate" disabled={status === 'running' || !photo} onClick={analyzeFace}>{status === 'running' ? <LoaderCircle className="spin" /> : <Sparkles />}{status === 'running' ? '解读中…' : '开始娱乐解读'}</button><p>视觉模型 · 仅描述可见特征 · 不作事实判断</p></div>
     </section>
     <section className="preview-panel face-preview"><div className="preview-heading"><div className="eyebrow"><Sparkles size={15} />传统文化娱乐解读</div><h1>AI 看相</h1><p>从面部可见特征出发，体验传统文化中的象征性表达。</p></div>
-      {result ? <div className="face-result"><div className="face-result-summary"><img src={photo.src} alt="人像缩略图" /><div><span>{focus}</span><h2>{result.summary}</h2></div></div><div className="face-observations">{(result.observations || []).map((item, index) => <article key={`${item.label}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span><h3>{item.label}</h3><p>{item.text}</p></article>)}</div>{result.suggestions?.length > 0 && <div className="face-suggestions"><strong>生活建议</strong>{result.suggestions.map((item) => <span key={item}>{item}</span>)}</div>}<p className="face-closing">{result.closing}</p></div> : <div className="face-empty"><UserRound size={54} /><strong>等待照片</strong><span>上传清晰正面照片后开始体验</span></div>}
+      {result ? <div className="face-result"><div className="face-result-summary"><img src={photo.src} alt="人像缩略图" /><div><span>{focus}</span><h2>{result.summary}</h2></div></div><div className="face-observations">{(result.observations || []).map((item, index) => <article key={`${item.label}-${index}`}><span>{String(index + 1).padStart(2, '0')}</span><h3>{item.label}</h3><p>{item.text}</p></article>)}</div>{result.suggestions?.length > 0 && <div className="face-suggestions"><strong>生活建议</strong>{result.suggestions.map((item) => <span key={item}>{item}</span>)}</div>}<p className="face-closing">{result.closing}</p></div> : <ModuleShowcase image="/assets/scene-commute.webp" icon={UserRound} kicker="Portrait insight" title="从一张清晰人像开始" detail="以克制、友好的方式呈现可见特征与传统文化意象。" align="right" />}
     </section>
   </main>;
 }
@@ -990,7 +991,7 @@ function AiPpt({ configured, authRequired, authToken, onLoginRequired, setNotice
       <div className="generate-wrap"><button className="generate" disabled={status === 'running' || !topic.trim()} onClick={generateDeck}>{status === 'running' ? <LoaderCircle className="spin" /> : <Presentation />}{status === 'running' ? '正在生成…' : '生成演示文稿'}</button>{deck && <button className="ppt-download" onClick={async () => { try { setNotice('正在导出 PowerPoint…'); await downloadPptx(deck, style); setNotice('PPTX 已下载'); } catch (error) { setNotice(`导出失败：${error.message}`); } }}><Download size={16} />下载 .pptx</button>}</div>
     </section>
     <section className="ppt-preview" style={{ '--ppt-bg': `#${theme.bg}`, '--ppt-panel': `#${theme.panel}`, '--ppt-accent': `#${theme.accent}`, '--ppt-text': `#${theme.text}`, '--ppt-muted': `#${theme.muted}` }}>
-      {deck ? <><div className="ppt-thumbnails">{deck.slides.map((item, index) => <button key={`${item.title}-${index}`} className={selectedSlide === index ? 'selected' : ''} onClick={() => setSelectedSlide(index)}><span>{index + 1}</span><div><strong>{index === 0 ? deck.title : item.title}</strong>{index > 0 && <small>{(item.points || []).slice(0, 2).join(' / ')}</small>}</div></button>)}</div><div className="ppt-canvas-wrap"><div className="ppt-canvas">{selectedSlide === 0 ? <div className="ppt-cover"><input value={deck.title || ''} onChange={(event) => setDeck({ ...deck, title: event.target.value })} /><textarea value={deck.subtitle || ''} onChange={(event) => setDeck({ ...deck, subtitle: event.target.value })} /><span>Kylin Glory Design</span></div> : <div className="ppt-content-slide"><input value={slide?.title || ''} onChange={(event) => updateSlide({ title: event.target.value })} /><div className="ppt-slide-body"><textarea value={(slide?.points || []).join('\n')} onChange={(event) => updateSlide({ points: event.target.value.split('\n').filter(Boolean) })} /><textarea className="ppt-visual" value={slide?.visual || ''} onChange={(event) => updateSlide({ visual: event.target.value })} /></div><span>{String(selectedSlide + 1).padStart(2, '0')}</span></div>}</div>{slide && <div className="ppt-speaker-notes"><strong>演讲备注</strong><textarea value={slide.speakerNotes || ''} onChange={(event) => updateSlide({ speakerNotes: event.target.value })} /></div>}</div></> : <div className="ppt-empty"><Presentation size={52} /><strong>从主题生成完整演示</strong><span>逐页编辑内容，并导出标准 PowerPoint 文件</span></div>}
+      {deck ? <><div className="ppt-thumbnails">{deck.slides.map((item, index) => <button key={`${item.title}-${index}`} className={selectedSlide === index ? 'selected' : ''} onClick={() => setSelectedSlide(index)}><span>{index + 1}</span><div><strong>{index === 0 ? deck.title : item.title}</strong>{index > 0 && <small>{(item.points || []).slice(0, 2).join(' / ')}</small>}</div></button>)}</div><div className="ppt-canvas-wrap"><div className="ppt-canvas">{selectedSlide === 0 ? <div className="ppt-cover"><input value={deck.title || ''} onChange={(event) => setDeck({ ...deck, title: event.target.value })} /><textarea value={deck.subtitle || ''} onChange={(event) => setDeck({ ...deck, subtitle: event.target.value })} /><span>Kylin Glory Design</span></div> : <div className="ppt-content-slide"><input value={slide?.title || ''} onChange={(event) => updateSlide({ title: event.target.value })} /><div className="ppt-slide-body"><textarea value={(slide?.points || []).join('\n')} onChange={(event) => updateSlide({ points: event.target.value.split('\n').filter(Boolean) })} /><textarea className="ppt-visual" value={slide?.visual || ''} onChange={(event) => updateSlide({ visual: event.target.value })} /></div><span>{String(selectedSlide + 1).padStart(2, '0')}</span></div>}</div>{slide && <div className="ppt-speaker-notes"><strong>演讲备注</strong><textarea value={slide.speakerNotes || ''} onChange={(event) => updateSlide({ speakerNotes: event.target.value })} /></div>}</div></> : <ModuleShowcase image="/assets/scene-business.webp" icon={Presentation} kicker="Presentation studio" title="把复杂内容讲清楚" detail="从主题到完整结构，一次生成可编辑、可交付的演示文稿。" />}
     </section>
   </main>;
 }
@@ -1115,6 +1116,14 @@ function ToolHeading({ tool, platform, market }) {
   return <div className="preview-heading"><div className="eyebrow"><Sparkles size={15} />AI 生成 · 高清商用</div><h1>{tool}</h1><p>{tool === '海外电商' ? `为 ${platform} · ${market} 市场生成符合 Listing 规范的产品图集。` : '生成结果已完成，可打开原图下载。'}</p></div>;
 }
 
+function ModuleShowcase({ image, icon: Icon, kicker, title, detail, align = 'left', children }) {
+  return <div className={`module-showcase align-${align}`}>
+    <img src={asset(image)} alt={`${title} 产品视觉示例`} />
+    <div className="module-showcase-shade" />
+    <div className="module-showcase-copy"><span><Icon size={14} />{kicker}</span><strong>{title}</strong><p>{detail}</p>{children}</div>
+  </div>;
+}
+
 function GeneratedGrid({ outputs }) { return <div className="generated-grid">{outputs.map((url, index) => <article key={url}><img src={url} alt={`AI 生成图片 ${index + 1}`} /><a href={url} target="_blank" rel="noreferrer">查看原图</a></article>)}</div>; }
 
 function BasePreview() {
@@ -1126,7 +1135,8 @@ function OverseasPreview({ platform, market }) {
 }
 
 function PosterTemplates({ onUse }) {
-  return <div className="poster-library"><div className="poster-title"><span>模板起点</span><h1>从一个好版式开始</h1><p>点击任意模板自动填入左侧 Prompt，改几处内容即可生成。</p></div><div className="template-grid">{posterTemplates.map(([name, desc, prompt], index) => <button key={name} className={`template-card template-${index % 6}`} onClick={() => onUse(prompt)}><span>使用此模板</span><div><strong>{name}</strong><small>{desc}</small></div></button>)}</div></div>;
+  const images = ['/assets/detail-hero.webp', '/assets/scene-commute.webp', '/assets/scene-sport.webp', '/assets/scene-business.webp'];
+  return <div className="poster-library"><div className="poster-title"><span>模板起点</span><h1>从一个好版式开始</h1><p>点击任意模板自动填入左侧 Prompt，改几处内容即可生成。</p></div><div className="template-grid">{posterTemplates.map(([name, desc, prompt], index) => <button key={name} className={`template-card template-${index % 6}`} onClick={() => onUse(prompt)}><img src={asset(images[index % images.length])} alt="" /><span>使用此模板</span><div><strong>{name}</strong><small>{desc}</small></div></button>)}</div></div>;
 }
 
 function ProductPreview() {
