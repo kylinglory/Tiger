@@ -436,6 +436,45 @@ async function submitAndPoll({ prompt, images, aspectRatio, count, authToken, on
   throw new Error('生成时间较长，请稍后重试');
 }
 
+function ipParsedItems(parsed) {
+  const data = parsed?.data || parsed?.result || parsed || {};
+  const lists = [data.items, data.aweme_list, data.videos, data.posts, data.list, data.products, Array.isArray(data) ? data : null];
+  return lists.find((item) => Array.isArray(item) && item.length) || [];
+}
+
+function ipFallbackReport(parsed, copy) {
+  const data = parsed?.data || parsed?.result || parsed || {};
+  const profile = data.user || data.author || data.profile || data.account || {};
+  const items = ipParsedItems(parsed).slice(0, 5);
+  const itemTitle = (item, index) => item.title || item.desc || item.caption || item.name || `热门作品 ${index + 1}`;
+  return {
+    profile: {
+      name: profile.nickname || profile.name || data.nickname || data.name || '账号分析',
+      positioning: copy.body || data.signature || profile.signature || '已完成主页内容解析。',
+      audience: '请结合账号实际受众进一步确认',
+      contentPillars: copy.hashtags ? copy.hashtags.split(/\s+/).filter(Boolean).slice(0, 6) : [],
+    },
+    metrics: { worksAnalyzed: items.length || '未提供', engagement: '以平台解析数据为准', topPattern: copy.title || '热门内容规律' },
+    topWorks: items.map((item, index) => ({ title: itemTitle(item, index), reason: item.description || item.desc || item.caption || '来自账号热门内容列表', hook: '提炼首句核心冲突或收益点', structure: '开场钩子 → 核心内容 → 行动引导' })),
+    titleIdeas: items.map(itemTitle).concat(copy.title ? [copy.title] : []).slice(0, 8),
+    scripts: copy.body ? [{ title: copy.title || '推荐口播', duration: '约 60 秒', content: copy.body }] : [],
+    summary: copy.body || '账号内容已完成解析。',
+  };
+}
+
+async function runCompatibleIpAnalysis(platform, url, authToken) {
+  const parsed = await fetch(apiUrl('/api/parse'), {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader(authToken) },
+    body: JSON.stringify({ platform, url, type: 'note', limit: 20 }),
+  }).then(readApiResponse);
+  const platformName = platform === 'douyin' ? '抖音' : '视频号';
+  const edited = await fetch(apiUrl('/api/editor/generate'), {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader(authToken) },
+    body: JSON.stringify({ model: 'gpt-5.5', platform: platformName, language: '简体中文', tone: '专业可信', objective: '知识分享', operation: 'generate', source: `请分析以下账号解析数据，总结内容定位、爆款规律，并给出可直接拍摄的标题和口播建议。不得虚构数据。\n${JSON.stringify(parsed).slice(0, 12000)}` }),
+  }).then(readApiResponse);
+  return ipFallbackReport(parsed, parseEditorContent(edited.content));
+}
+
 function IpAnalysisWorkspace({ configured, authRequired, authToken, onLoginRequired, setNotice }) {
   const [platform, setPlatform] = useState('douyin');
   const [url, setUrl] = useState('');
@@ -455,13 +494,20 @@ function IpAnalysisWorkspace({ configured, authRequired, authToken, onLoginRequi
     if (!url.trim()) return setNotice('请粘贴账号主页链接');
     setStatus('running'); setReport(null); setNotice('正在解析主页与热门作品…');
     try {
-      const response = await fetch(apiUrl('/api/ip-analysis'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader(authToken) },
-        body: JSON.stringify({ platform, url: url.trim() }),
-      });
-      const body = await readApiResponse(response);
-      setNotice('正在整理爆款规律与口播脚本…');
-      setReport(parseJsonModelContent(body.content)); setStatus('done'); setNotice('爆款 IP 分析报告已生成');
+      try {
+        const response = await fetch(apiUrl('/api/ip-analysis'), {
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader(authToken) },
+          body: JSON.stringify({ platform, url: url.trim() }),
+        });
+        const body = await readApiResponse(response);
+        setNotice('正在整理爆款规律与口播脚本…');
+        setReport(parseJsonModelContent(body.content));
+      } catch (error) {
+        if (error.message !== apiUnavailableMessage) throw error;
+        setNotice('正在使用兼容分析流程生成报告…');
+        setReport(await runCompatibleIpAnalysis(platform, url.trim(), authToken));
+      }
+      setStatus('done'); setNotice('爆款 IP 分析报告已生成');
     } catch (error) { setStatus('error'); setNotice(error.message); }
   }
 
