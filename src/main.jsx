@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  Archive, BarChart3, Bluetooth, Box, Check, ChevronDown, Cloud, Copy, CreditCard,
+  Archive, BarChart3, Check, ChevronDown, Cloud, Copy, CreditCard,
   Download, ExternalLink, FileImage, FileText, FolderOpen, Globe2, Image, ImagePlus, Images, Link2,
   LoaderCircle, LogIn, Megaphone, Menu, Mic, MonitorPlay, MoreHorizontal, Package,
   Plus, Presentation, RotateCcw, Search, ShieldCheck, Sparkles, Trash2, Upload, UserRound, WandSparkles,
@@ -1254,10 +1254,10 @@ function PosterTemplates({ onUse }) {
 
 function ProductPreview() {
   return <div className="product-preview">
-    <div className="hero-image"><img src={asset('/assets/detail-hero.webp')} alt="AI 生成的产品主图示例" /><span className="seller">BEST SELLER</span><span className="rating">★★★★★ <b>4.9 / 1,283</b></span></div>
-    <div className="feature-row"><div><Zap /><b>主动降噪</b></div><div><Box /><b>40h 续航</b></div><div><Bluetooth /><b>蓝牙 5.3</b></div></div>
-    <div className="spec-row"><span>Hi-Fi 立体声</span><span>快充 10min = 6h</span><span>多端无缝连接</span></div>
-    <div className="scenes"><Scene src={asset('/assets/scene-commute.webp')} name="通勤" /><Scene src={asset('/assets/scene-sport.webp')} name="运动" /><Scene src={asset('/assets/scene-business.webp')} name="商务" /></div>
+    <div className="hero-image"><img src={asset('/assets/detail-drone-hero.jpg')} alt="AI 生成的高端航拍产品主图示例" /><span className="seller">NEW ARRIVAL</span><span className="rating">★★★★★ <b>4.9 / 1,283</b></span></div>
+    <div className="feature-row"><div><MonitorPlay /><b>4K HDR 影像</b></div><div><ShieldCheck /><b>全向感知</b></div><div><Zap /><b>智能跟随</b></div></div>
+    <div className="spec-row"><span>三轴机械云台</span><span>31 min 续航</span><span>轻巧可折叠</span></div>
+    <div className="scenes"><Scene src={asset('/assets/detail-drone-travel.jpg')} name="山野航拍" /><Scene src={asset('/assets/detail-action-scene.jpg')} name="运动跟拍" /><Scene src={asset('/assets/detail-gimbal-scene.jpg')} name="专业影像" /></div>
     <div className="assurances"><span>正品保障</span><span>7 天无理由退换</span><span>顺丰包邮</span></div>
     <p className="demo-note">↑ 示意效果 · 真实生成由 AI 完成，可一键导出</p>
   </div>;
