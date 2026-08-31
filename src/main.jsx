@@ -1129,7 +1129,7 @@ function GeneratedGrid({ outputs }) { return <div className="generated-grid">{ou
 function BasePreview() {
   return <div className="base-showcase">
     <div className="base-showcase-heading"><span>1 张产品图 · N 种场景 · 秒出可商用</span><h1>商品底图</h1><p>一张产品图 — 多种场景化底图，一键定调、一键导出。</p></div>
-    <div className="base-preview-grid">{[['/assets/scene-commute.webp','原木禅意'],['/assets/scene-sport.webp','咖啡时光'],['/assets/scene-business.webp','礼盒派对'],['/assets/detail-hero.webp','都市夜色']].map(([src,name]) => <div key={name}><img src={asset(src)} alt={`AI 生成的 ${name} 场景示例`} /><span>{name}</span></div>)}</div>
+    <div className="base-preview-grid">{[['/assets/base-zen.webp','原木禅意'],['/assets/base-cafe.webp','咖啡时光'],['/assets/base-gift.webp','礼盒派对'],['/assets/base-night.webp','都市夜色']].map(([src,name]) => <div key={name}><img src={asset(src)} alt={`AI 生成的 ${name} 场景示例`} /><span>{name}</span></div>)}</div>
     <p className="demo-note">↑ 示意场景 · 本页支持 100+ 快捷场景，也可自定义 Prompt</p>
   </div>;
 }
