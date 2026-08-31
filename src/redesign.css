@@ -193,6 +193,17 @@ input, select, textarea { caret-color: var(--kg-blue); }
 .hero-image { border-radius: 7px 7px 0 0; box-shadow: 0 18px 55px rgba(0, 0, 0, .12); }
 .generated-grid article, .base-preview-grid div, .market-card, .parse-result-item,
 .social-preview, .draft-list article { border: 1px solid #d6d6da; border-radius: 7px; box-shadow: 0 12px 34px rgba(0,0,0,.07); }
+.base-showcase { width: min(1180px, 100%); margin: 0 auto; }
+.base-showcase-heading { margin: 0 auto 42px; text-align: center; }
+.base-showcase-heading > span { color: #7a7a80; font-size: 10px; font-weight: 650; }
+.base-showcase-heading h1 { margin: 15px 0 13px; color: #111214; font-size: 46px; line-height: 1.08; font-weight: 700; }
+.base-showcase-heading p { margin: 0; color: #6e6e73; font-size: 15px; line-height: 1.6; }
+.base-showcase .base-preview-grid { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.base-showcase .base-preview-grid div { aspect-ratio: .86; border: 0; border-radius: 5px; box-shadow: none; }
+.base-showcase .base-preview-grid span { left: 15px; bottom: 14px; padding: 0; color: #fff; background: transparent; font-size: 11px; font-weight: 600; text-shadow: 0 1px 8px rgba(0,0,0,.65); }
+.base-showcase .base-preview-grid div::after { content: ''; position: absolute; inset: 55% 0 0; background: linear-gradient(0deg, rgba(4,5,7,.58), transparent); pointer-events: none; }
+.base-showcase .base-preview-grid span { z-index: 1; }
+.base-showcase .demo-note { margin-top: 25px; }
 .generated-grid a { color: var(--kg-blue); }
 .video-empty, .parse-empty, .human-stage, .face-empty {
   border-color: #b9b9be;
@@ -282,6 +293,8 @@ input, select, textarea { caret-color: var(--kg-blue); }
   .workspace { inset: 62px 0 0; grid-template-columns: 350px minmax(540px, 1fr); }
   .simple-page { inset: 62px 0 0; }
   .drafts { width: 100%; }
+  .base-showcase .base-preview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .base-showcase .base-preview-grid div { aspect-ratio: 1.12; }
 }
 
 @media (max-width: 720px) {
@@ -290,6 +303,9 @@ input, select, textarea { caret-color: var(--kg-blue); }
   .brand-lockup { margin-right: auto; }
   .preview-panel { padding: 44px 16px 64px; }
   .preview-heading h1 { font-size: 30px; }
+  .base-showcase-heading { margin-bottom: 28px; }
+  .base-showcase-heading h1 { font-size: 34px; }
+  .base-showcase-heading p { font-size: 13px; }
   .control-panel, .editor-controls { padding-left: 16px; padding-right: 16px; }
   .simple-page { position: static; }
   .simple-page-inner { width: calc(100% - 28px); }
