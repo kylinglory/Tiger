@@ -364,7 +364,7 @@ function LoginGate({ form, setForm, status, notice, onSubmit }) {
         <img className="login-showcase-bg" src={asset('/assets/detail-hero.webp')} alt="AI 电商设计作品" />
         <div className="login-showcase-shade" />
         <img className="login-brand" src={asset('/assets/logo.png')} alt="Kylin Glory Design" />
-        <div className="login-message"><h1>一键生成全套</h1><strong>详情页 · 底图 · 海外电商</strong><p>AI 驱动的电商设计工作台。上传一张产品图，快速产出完整的营销素材。</p></div>
+        <div className="login-message"><h1>Design, reimagined.</h1><strong>让每一次创作，都更进一步。</strong><p>从商品视觉到视频与内容策略，一个安静、专注、完整的 AI 创作空间。</p></div>
         <p className="login-invite">Kylin Glory Design · the Best for You</p>
       </div>
       <div className="login-form-side"><form className="login-page-form" onSubmit={onSubmit}>
