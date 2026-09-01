@@ -1034,11 +1034,33 @@ function FaceReading({ configured, authRequired, authToken, onLoginRequired, set
 }
 
 const pptThemes = {
+  '苹果发布会': { bg: 'F5F5F7', panel: 'FFFFFF', accent: '0071E3', text: '1D1D1F', muted: '6E6E73' },
+  '小米发布会': { bg: 'F7F7F7', panel: 'FFFFFF', accent: 'FF6900', text: '191919', muted: '737373' },
+  '特斯拉发布会': { bg: '0B0B0C', panel: '171719', accent: 'E82127', text: 'FFFFFF', muted: 'B8B8BD' },
+  '华为发布会': { bg: 'F4F4F2', panel: 'FFFFFF', accent: 'CF0A2C', text: '202124', muted: '6F7275' },
+  '谷歌 I/O': { bg: 'FFFFFF', panel: 'F1F3F4', accent: '4285F4', text: '202124', muted: '5F6368' },
+  'OPPO 影像': { bg: 'F1F5F2', panel: 'FFFFFF', accent: '168C55', text: '14251D', muted: '647069' },
+  'TED 演讲': { bg: '111111', panel: '202020', accent: 'E62B1E', text: 'FFFFFF', muted: 'BEBEBE' },
+  '锤子发布会': { bg: 'ECEBE8', panel: 'F8F7F4', accent: '9A302E', text: '242321', muted: '77736E' },
   '商务简洁': { bg: 'F4F6F8', panel: 'FFFFFF', accent: '2764D8', text: '1F2937', muted: '667085' },
   '科技深色': { bg: '111827', panel: '192231', accent: '43B7E8', text: 'F8FAFC', muted: 'A9B4C5' },
   '极简黑白': { bg: 'FFFFFF', panel: 'F3F3F3', accent: '111111', text: '191919', muted: '6B6B6B' },
   '品牌红色': { bg: 'F7F7F5', panel: 'FFFFFF', accent: 'D9363E', text: '282A2F', muted: '737781' },
 };
+
+const pptTopicPresets = [
+  ['📱', '新品发布', '为一款新品制作发布会演示，讲清产品定位、核心创新、使用场景与上市计划。'],
+  ['📊', '商业计划书', '制作一份商业计划书，包含市场机会、产品方案、商业模式、竞争优势与财务展望。'],
+  ['📚', '读书分享', '制作一份读书分享演示，提炼核心观点、关键案例、个人启发与行动清单。'],
+  ['🎓', '毕业答辩', '制作一份毕业答辩演示，包含研究背景、方法过程、核心成果、结论与展望。'],
+  ['💼', '团队周报', '制作一份团队周报，清晰呈现本周进展、关键数据、问题风险与下周计划。'],
+  ['🚀', '创业路演', '制作一份创业路演演示，覆盖用户痛点、解决方案、市场规模、增长数据与融资计划。'],
+];
+
+const pptStyleSamples = [
+  ['苹果发布会', 'apple.webp'], ['小米发布会', 'xiaomi.webp'], ['特斯拉发布会', 'tesla.webp'], ['华为发布会', 'huawei.webp'],
+  ['谷歌 I/O', 'google.webp'], ['OPPO 影像', 'oppo.webp'], ['TED 演讲', 'ted.webp'], ['锤子发布会', 'smartisan.webp'],
+];
 
 async function downloadPptx(deck, style) {
   const { default: PptxGenJS } = await import('pptxgenjs');
@@ -1065,15 +1087,15 @@ async function downloadPptx(deck, style) {
 
 function AiPpt({ configured, authRequired, authToken, onLoginRequired, setNotice }) {
   const [topic, setTopic] = useState(''); const [audience, setAudience] = useState('公司客户');
-  const [objective, setObjective] = useState('清晰介绍主题'); const [style, setStyle] = useState('商务简洁');
+  const [objective, setObjective] = useState('清晰介绍主题'); const [style, setStyle] = useState('苹果发布会');
   const [language, setLanguage] = useState('简体中文'); const [slideCount, setSlideCount] = useState(8);
   const [notes, setNotes] = useState(''); const [model, setModel] = useState('gpt-5.5');
   const [deck, setDeck] = useState(null); const [selectedSlide, setSelectedSlide] = useState(0);
-  const [status, setStatus] = useState('idle');
+  const [status, setStatus] = useState('idle'); const [showSetup, setShowSetup] = useState(true);
 
   useEffect(() => {
     const saved = localStorage.getItem('xiaojishuo-ppt-draft'); if (!saved) return;
-    try { const data = JSON.parse(saved); setTopic(data.topic || ''); setAudience(data.audience || '公司客户'); setObjective(data.objective || '清晰介绍主题'); setStyle(data.style || '商务简洁'); setLanguage(data.language || '简体中文'); setSlideCount(data.slideCount || 8); setNotes(data.notes || ''); setModel(data.model || 'gpt-5.5'); if (data.deck) setDeck(data.deck); } catch { /* ignore */ }
+    try { const data = JSON.parse(saved); setTopic(data.topic || ''); setAudience(data.audience || '公司客户'); setObjective(data.objective || '清晰介绍主题'); setStyle(data.style || '苹果发布会'); setLanguage(data.language || '简体中文'); setSlideCount(data.slideCount || 8); setNotes(data.notes || ''); setModel(data.model || 'gpt-5.5'); if (data.deck) setDeck(data.deck); } catch { /* ignore */ }
   }, []);
   useEffect(() => { localStorage.setItem('xiaojishuo-ppt-draft', JSON.stringify({ topic, audience, objective, style, language, slideCount, notes, model, deck })); }, [topic, audience, objective, style, language, slideCount, notes, model, deck]);
 
@@ -1086,21 +1108,22 @@ function AiPpt({ configured, authRequired, authToken, onLoginRequired, setNotice
       const response = await fetch(apiUrl('/api/ppt/generate'), { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeader(authToken) }, body: JSON.stringify({ topic, audience, objective, style, language, slideCount, notes, model }) });
       const body = await readApiResponse(response); const parsed = parseJsonModelContent(body.content);
       if (!Array.isArray(parsed.slides) || !parsed.slides.length) throw new Error('模型没有返回有效幻灯片');
-      setDeck(parsed); setSelectedSlide(0); setStatus('done'); setNotice(`已生成 ${parsed.slides.length} 页 PPT`);
+      setDeck(parsed); setSelectedSlide(0); setShowSetup(false); setStatus('done'); setNotice(`已生成 ${parsed.slides.length} 页 PPT`);
     } catch (error) { setStatus('error'); setNotice(error.message); }
   }
 
   function updateSlide(patch) { setDeck((current) => ({ ...current, slides: current.slides.map((slide, index) => index === selectedSlide ? { ...slide, ...patch } : slide) })); }
-  const slide = deck?.slides?.[selectedSlide]; const theme = pptThemes[style] || pptThemes['商务简洁'];
-  return <main className="workspace tool-workspace ppt-workspace">
-    <section className="control-panel">
-      <div className="panel-section brief-section"><h2>演示主题</h2><textarea className="ppt-topic" value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="例如：Kylin Glory 2027 品牌升级提案" /></div>
-      <div className="panel-section"><h2>生成设置</h2><div className="ppt-settings"><select value={audience} onChange={(event) => setAudience(event.target.value)}>{['公司客户','管理层','销售团队','投资人','普通公众','培训学员'].map((item) => <option key={item}>{item}</option>)}</select><select value={objective} onChange={(event) => setObjective(event.target.value)}>{['清晰介绍主题','销售提案','项目汇报','培训教学','融资路演','年度总结'].map((item) => <option key={item}>{item}</option>)}</select><select value={style} onChange={(event) => setStyle(event.target.value)}>{Object.keys(pptThemes).map((item) => <option key={item}>{item}</option>)}</select><select value={language} onChange={(event) => setLanguage(event.target.value)}>{['简体中文','英文','日文','韩文'].map((item) => <option key={item}>{item}</option>)}</select><select value={model} onChange={(event) => setModel(event.target.value)}><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.6-sol">GPT-5.6 Sol</option></select><label className="ppt-count"><span>页数</span><input type="number" min="4" max="20" value={slideCount} onChange={(event) => setSlideCount(event.target.value)} /></label></div></div>
-      <div className="panel-section brief-section"><h2>补充资料（可选）</h2><textarea className="ppt-notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="粘贴数据、产品信息、已有大纲或必须包含的观点…" /></div>
-      <div className="generate-wrap"><button className="generate" disabled={status === 'running' || !topic.trim()} onClick={generateDeck}>{status === 'running' ? <LoaderCircle className="spin" /> : <Presentation />}{status === 'running' ? '正在生成…' : '生成演示文稿'}</button>{deck && <button className="ppt-download" onClick={async () => { try { setNotice('正在导出 PowerPoint…'); await downloadPptx(deck, style); setNotice('PPTX 已下载'); } catch (error) { setNotice(`导出失败：${error.message}`); } }}><Download size={16} />下载 .pptx</button>}</div>
-    </section>
-    <section className="ppt-preview" style={{ '--ppt-bg': `#${theme.bg}`, '--ppt-panel': `#${theme.panel}`, '--ppt-accent': `#${theme.accent}`, '--ppt-text': `#${theme.text}`, '--ppt-muted': `#${theme.muted}` }}>
-      {deck ? <><div className="ppt-thumbnails">{deck.slides.map((item, index) => <button key={`${item.title}-${index}`} className={selectedSlide === index ? 'selected' : ''} onClick={() => setSelectedSlide(index)}><span>{index + 1}</span><div><strong>{index === 0 ? deck.title : item.title}</strong>{index > 0 && <small>{(item.points || []).slice(0, 2).join(' / ')}</small>}</div></button>)}</div><div className="ppt-canvas-wrap"><div className="ppt-canvas">{selectedSlide === 0 ? <div className="ppt-cover"><input value={deck.title || ''} onChange={(event) => setDeck({ ...deck, title: event.target.value })} /><textarea value={deck.subtitle || ''} onChange={(event) => setDeck({ ...deck, subtitle: event.target.value })} /><span>Kylin Glory Design</span></div> : <div className="ppt-content-slide"><input value={slide?.title || ''} onChange={(event) => updateSlide({ title: event.target.value })} /><div className="ppt-slide-body"><textarea value={(slide?.points || []).join('\n')} onChange={(event) => updateSlide({ points: event.target.value.split('\n').filter(Boolean) })} /><textarea className="ppt-visual" value={slide?.visual || ''} onChange={(event) => updateSlide({ visual: event.target.value })} /></div><span>{String(selectedSlide + 1).padStart(2, '0')}</span></div>}</div>{slide && <div className="ppt-speaker-notes"><strong>演讲备注</strong><textarea value={slide.speakerNotes || ''} onChange={(event) => updateSlide({ speakerNotes: event.target.value })} /></div>}</div></> : <ModuleShowcase image="/assets/scene-business.webp" icon={Presentation} kicker="Presentation studio" title="把复杂内容讲清楚" detail="从主题到完整结构，一次生成可编辑、可交付的演示文稿。" />}
+  const slide = deck?.slides?.[selectedSlide]; const theme = pptThemes[style] || pptThemes['苹果发布会'];
+  const downloadDeck = async () => { try { setNotice('正在导出 PowerPoint…'); await downloadPptx(deck, style); setNotice('PPTX 已下载'); } catch (error) { setNotice(`导出失败：${error.message}`); } };
+  return <main className="workspace ppt-studio-page">
+    <section className="ppt-studio-shell">
+      <div className="ppt-flow"><span className={showSetup ? 'active' : 'done'}><b>1</b>填写内容</span><i>›</i><span className={showSetup ? '' : 'done'}><b>2</b>策划大纲</span><i>›</i><span className={status === 'running' ? 'active' : ''}><b>3</b>生成演示</span><i>›</i><span className={!showSetup && deck ? 'active' : ''}><b>4</b>浏览 / 下载</span></div>
+      {showSetup || !deck ? <div className="ppt-setup">
+        <header className="ppt-hero"><span>AI PRESENTATION STUDIO</span><h1>30 秒生成一份专业 PPT</h1><p>选个主题或风格开始，内容和设置都可以继续编辑。</p></header>
+        <section className="ppt-preset-section"><div className="ppt-section-heading"><span>01</span><div><h2>你想做什么？</h2><p>选择常用主题，自动填入一份可修改的内容说明。</p></div></div><div className="ppt-topic-grid">{pptTopicPresets.map(([icon, name, prompt]) => <button key={name} className={topic === prompt ? 'selected' : ''} onClick={() => setTopic(prompt)}><span>{icon}</span><strong>{name}</strong></button>)}</div></section>
+        <section className="ppt-preset-section"><div className="ppt-section-heading"><span>02</span><div><h2>选择演示风格</h2><p>已同步原网站的 8 套发布会样张素材。</p></div></div><div className="ppt-style-grid">{pptStyleSamples.map(([name, image]) => <button key={name} className={style === name ? 'selected' : ''} onClick={() => setStyle(name)}><span><img src={asset(`/assets/ppt-samples/${image}`)} alt={`${name}样张`} /></span><strong>{name}</strong>{style === name && <Check size={16} />}</button>)}</div></section>
+        <section className="ppt-composer"><div className="ppt-section-heading"><span>03</span><div><h2>补充你的内容</h2><p>描述重点、受众和希望得到的结果。</p></div></div><textarea className="ppt-topic" value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="输入你想做的 PPT 内容、要点、目标受众…也可以一次粘贴一大段文字" /><div className="ppt-settings"> <label><span>目标受众</span><select value={audience} onChange={(event) => setAudience(event.target.value)}>{['公司客户','管理层','销售团队','投资人','普通公众','培训学员'].map((item) => <option key={item}>{item}</option>)}</select></label><label><span>演示目标</span><select value={objective} onChange={(event) => setObjective(event.target.value)}>{['清晰介绍主题','销售提案','项目汇报','培训教学','融资路演','年度总结'].map((item) => <option key={item}>{item}</option>)}</select></label><label><span>语言</span><select value={language} onChange={(event) => setLanguage(event.target.value)}>{['简体中文','英文','日文','韩文'].map((item) => <option key={item}>{item}</option>)}</select></label><label><span>内容模型</span><select value={model} onChange={(event) => setModel(event.target.value)}><option value="gpt-5.5">GPT-5.5</option><option value="gpt-5.6-sol">GPT-5.6 Sol</option></select></label><label className="ppt-count"><span>幻灯片页数</span><input type="number" min="4" max="20" value={slideCount} onChange={(event) => setSlideCount(event.target.value)} /></label></div><textarea className="ppt-notes" value={notes} onChange={(event) => setNotes(event.target.value)} placeholder="补充资料（可选）：粘贴数据、产品信息、已有大纲或必须包含的观点…" /><div className="ppt-submit-row">{deck && <button className="ppt-view-deck" onClick={() => setShowSetup(false)}>查看上次演示稿</button>}<button className="generate" disabled={status === 'running' || !topic.trim()} onClick={generateDeck}>{status === 'running' ? <LoaderCircle className="spin" /> : <Sparkles />}{status === 'running' ? '正在生成…' : '生成大纲与演示文稿'}</button></div></section>
+      </div> : <div className="ppt-result"><div className="ppt-result-bar"><div><span>{style}</span><strong>{deck.title || 'AI 演示文稿'}</strong></div><div><button onClick={() => setShowSetup(true)}>修改设置</button><button className="ppt-download" onClick={downloadDeck}><Download size={16} />下载 .pptx</button></div></div><section className="ppt-preview" style={{ '--ppt-bg': `#${theme.bg}`, '--ppt-panel': `#${theme.panel}`, '--ppt-accent': `#${theme.accent}`, '--ppt-text': `#${theme.text}`, '--ppt-muted': `#${theme.muted}` }}><div className="ppt-thumbnails">{deck.slides.map((item, index) => <button key={`${item.title}-${index}`} className={selectedSlide === index ? 'selected' : ''} onClick={() => setSelectedSlide(index)}><span>{index + 1}</span><div><strong>{index === 0 ? deck.title : item.title}</strong>{index > 0 && <small>{(item.points || []).slice(0, 2).join(' / ')}</small>}</div></button>)}</div><div className="ppt-canvas-wrap"><div className="ppt-canvas">{selectedSlide === 0 ? <div className="ppt-cover"><input value={deck.title || ''} onChange={(event) => setDeck({ ...deck, title: event.target.value })} /><textarea value={deck.subtitle || ''} onChange={(event) => setDeck({ ...deck, subtitle: event.target.value })} /><span>Kylin Glory Design</span></div> : <div className="ppt-content-slide"><input value={slide?.title || ''} onChange={(event) => updateSlide({ title: event.target.value })} /><div className="ppt-slide-body"><textarea value={(slide?.points || []).join('\n')} onChange={(event) => updateSlide({ points: event.target.value.split('\n').filter(Boolean) })} /><textarea className="ppt-visual" value={slide?.visual || ''} onChange={(event) => updateSlide({ visual: event.target.value })} /></div><span>{String(selectedSlide + 1).padStart(2, '0')}</span></div>}</div>{slide && <div className="ppt-speaker-notes"><strong>演讲备注</strong><textarea value={slide.speakerNotes || ''} onChange={(event) => updateSlide({ speakerNotes: event.target.value })} /></div>}</div></section></div>}
     </section>
   </main>;
 }
