@@ -193,7 +193,7 @@ async function proxyJsonWithRetry(url, options, attempts = 3) {
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function extractDouyinAuthor(url) {
-  const task = await proxyJson(`${parseApiBase}/extractions`, {
+  const task = await proxyJsonWithRetry(`${parseApiBase}/extractions`, {
     method: 'POST',
     headers: parseAuthHeaders(),
     body: JSON.stringify({
@@ -204,7 +204,7 @@ async function extractDouyinAuthor(url) {
       metadata_limit: 10,
       transcribe_model: 'base',
     }),
-  });
+  }, 5);
   const taskId = task.id || task.task_id;
   if (!taskId) throw new Error('抖音提取服务未返回任务编号');
 
@@ -433,11 +433,21 @@ app.post('/api/ip-analysis', requireLogin, async (req, res) => {
 
   let parsed;
   try {
-    parsed = platform === 'douyin'
-      ? await extractDouyinAuthor(url.trim())
-      : await proxyJsonWithRetry(`${parseApiBase}/parse/wechat-channels`, {
+    if (platform === 'douyin') {
+      try {
+        parsed = await extractDouyinAuthor(url.trim());
+      } catch (error) {
+        if (![429, 502, 503].includes(error.status)) throw error;
+        console.warn('[ip-analysis] author extraction busy, using basic douyin parser', { status: error.status });
+        parsed = await proxyJsonWithRetry(`${parseApiBase}/parse/douyin`, {
+          method: 'POST', headers: parseAuthHeaders(), body: JSON.stringify({ url: url.trim() }),
+        });
+      }
+    } else {
+      parsed = await proxyJsonWithRetry(`${parseApiBase}/parse/wechat-channels`, {
         method: 'POST', headers: parseAuthHeaders(), body: JSON.stringify({ url: url.trim() }),
       });
+    }
     if (parsed?.success === false) throw new Error(parsed.error?.message || parsed.error || '账号内容解析失败');
   } catch (error) {
     console.error('[ip-analysis] profile extraction failed', { platform, status: error.status, message: error.message });
