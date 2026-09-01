@@ -190,6 +190,44 @@ async function proxyJsonWithRetry(url, options, attempts = 3) {
   throw lastError;
 }
 
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function extractDouyinAuthor(url) {
+  const task = await proxyJson(`${parseApiBase}/extractions`, {
+    method: 'POST',
+    headers: parseAuthHeaders(),
+    body: JSON.stringify({
+      model: 'douyin-copy-extract',
+      url,
+      mode: 'author_popular',
+      limit: 3,
+      metadata_limit: 10,
+      transcribe_model: 'base',
+    }),
+  });
+  const taskId = task.id || task.task_id;
+  if (!taskId) throw new Error('抖音提取服务未返回任务编号');
+
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    await wait(3000);
+    const status = await proxyJson(`${parseApiBase}/extractions/${encodeURIComponent(taskId)}`, {
+      headers: parseAuthHeaders(),
+    });
+    const state = String(status.status || '').toLowerCase();
+    if (['failed', 'error', 'cancelled', 'canceled'].includes(state)) {
+      throw new Error(status.error?.message || status.error || status.message || '抖音账号内容提取失败');
+    }
+    if (['completed', 'complete', 'succeeded', 'success', 'done'].includes(state)) {
+      return proxyJson(`${parseApiBase}/extractions/${encodeURIComponent(taskId)}/result`, {
+        headers: parseAuthHeaders(),
+      });
+    }
+  }
+  const error = new Error('抖音账号内容提取超时，请稍后重试');
+  error.status = 504;
+  throw error;
+}
+
 function amazonLookup(value, selectedMarketplace) {
   const input = String(value || '').trim();
   const directAsin = input.match(/^[A-Z0-9]{10}$/i)?.[0];
@@ -393,10 +431,23 @@ app.post('/api/ip-analysis', requireLogin, async (req, res) => {
   if (!['douyin', 'wechat-channels'].includes(platform)) return res.status(400).json({ error: { message: '仅支持抖音和视频号分析' } });
   if (!url.trim()) return res.status(400).json({ error: { message: '请粘贴账号主页链接' } });
 
+  let parsed;
   try {
-    const parsed = await proxyJsonWithRetry(`${parseApiBase}/parse/${platform}`, {
-      method: 'POST', headers: parseAuthHeaders(), body: JSON.stringify({ url: url.trim() }),
+    parsed = platform === 'douyin'
+      ? await extractDouyinAuthor(url.trim())
+      : await proxyJsonWithRetry(`${parseApiBase}/parse/wechat-channels`, {
+        method: 'POST', headers: parseAuthHeaders(), body: JSON.stringify({ url: url.trim() }),
+      });
+    if (parsed?.success === false) throw new Error(parsed.error?.message || parsed.error || '账号内容解析失败');
+  } catch (error) {
+    console.error('[ip-analysis] profile extraction failed', { platform, status: error.status, message: error.message });
+    const busy = [429, 502, 503].includes(error.status);
+    return res.status(error.status || 502).json({
+      error: { message: busy ? '主页解析服务当前请求较多，请稍后重试' : `主页解析失败：${error.message}`, code: error.code },
     });
+  }
+
+  try {
     const source = JSON.stringify(parsed).slice(0, 26000);
     const data = await proxyJson(`${creativeApiBase}/chat/completions`, {
       method: 'POST',
@@ -413,8 +464,9 @@ app.post('/api/ip-analysis', requireLogin, async (req, res) => {
     if (!content) throw new Error('内容模型未返回分析报告');
     res.json({ content, platform, sourceCount: Array.isArray(parsed?.data) ? parsed.data.length : null, usage: data.usage || null });
   } catch (error) {
+    console.error('[ip-analysis] report generation failed', { platform, status: error.status, message: error.message });
     const busy = [429, 502, 503].includes(error.status);
-    res.status(error.status || 500).json({ error: { message: busy ? '账号分析服务暂时繁忙，请稍后再试' : error.message, code: error.code } });
+    res.status(error.status || 500).json({ error: { message: busy ? '报告生成服务当前请求较多，请稍后重试' : `报告生成失败：${error.message}`, code: error.code } });
   }
 });
 
