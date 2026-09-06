@@ -86,7 +86,11 @@ function readCookie(req, name) {
   return cookies.split(';').map((item) => item.trim()).find((item) => item.startsWith(`${name}=`))?.slice(name.length + 1);
 }
 
-function sessionCookieValue(token) {
+function requestIsSecure(req) {
+  return req.secure || req.get('x-forwarded-proto') === 'https';
+}
+
+function sessionCookieValue(req, token) {
   const parts = [
     `${sessionCookie}=${encodeURIComponent(token)}`,
     'Path=/',
@@ -94,12 +98,12 @@ function sessionCookieValue(token) {
     'SameSite=Lax',
     `Max-Age=${Math.round(sessionTtlMs / 1000)}`,
   ];
-  if (isProduction) parts.push('Secure');
+  if (isProduction && requestIsSecure(req)) parts.push('Secure');
   return parts.join('; ');
 }
 
-function clearSessionCookieValue() {
-  return `${sessionCookie}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${isProduction ? '; Secure' : ''}`;
+function clearSessionCookieValue(req) {
+  return `${sessionCookie}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${isProduction && requestIsSecure(req) ? '; Secure' : ''}`;
 }
 
 function currentSession(req) {
@@ -275,7 +279,7 @@ app.post('/api/login', (req, res) => {
     return res.status(401).json({ error: { message: '账号或密码不正确' } });
   }
   const token = signSession({ username: appUsername, exp: Date.now() + sessionTtlMs });
-  res.setHeader('Set-Cookie', sessionCookieValue(token));
+  res.setHeader('Set-Cookie', sessionCookieValue(req, token));
   res.json({
     username: appUsername,
     token,
@@ -295,12 +299,12 @@ app.post('/login', (req, res) => {
     return res.redirect('/login?error=1');
   }
   const token = signSession({ username: appUsername, exp: Date.now() + sessionTtlMs });
-  res.setHeader('Set-Cookie', sessionCookieValue(token));
+  res.setHeader('Set-Cookie', sessionCookieValue(req, token));
   res.redirect(String(next).startsWith('/') ? next : '/');
 });
 
-app.post('/api/logout', (_req, res) => {
-  res.setHeader('Set-Cookie', clearSessionCookieValue());
+app.post('/api/logout', (req, res) => {
+  res.setHeader('Set-Cookie', clearSessionCookieValue(req));
   res.json({ ok: true });
 });
 
