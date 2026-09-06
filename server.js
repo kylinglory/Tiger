@@ -5,7 +5,7 @@ import { createHmac, randomUUID, timingSafeEqual } from 'crypto';
 
 const app = express();
 const port = Number(process.env.PORT || 8787);
-const apiBase = process.env.XIAOJI_API_BASE || 'https://xiaoji.baziapi.site/v1';
+const apiBase = process.env.XIAOJI_API_BASE || 'https://xjjuhe.site/v1';
 const videoApiBase = process.env.VIDEO_API_BASE || 'https://xjjuhe.site/v1';
 const videoApiKey = process.env.VIDEO_API_KEY || process.env.XIAOJI_API_KEY;
 const parseApiBase = process.env.PARSE_API_BASE || videoApiBase;
@@ -324,7 +324,7 @@ app.post('/api/generate', requireLogin, async (req, res) => {
       method: 'POST',
       headers: authHeaders(),
       body: JSON.stringify({
-        model: 'gpt-image-2', prompt, n: Math.min(Math.max(Number(n), 1), 4),
+        model: 'gpt-image-2', prompt, n: 1,
         aspect_ratio: aspectRatio, quality: 'hd', response_format: 'url',
         ...(referenceImages.length ? { reference_images: referenceImages.slice(0, 3) } : {}),
       }),

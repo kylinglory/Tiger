@@ -166,30 +166,7 @@ function App() {
     if (!selectedModules.length) return setNotice('请至少选择一个页面模块');
     setStatus('submitting'); setNotice('正在提交生成任务…'); setProgress(8);
     try {
-      const response = await fetch(apiUrl('/api/generate'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...authHeader(authToken) },
-        body: JSON.stringify({ prompt, referenceImages: images.map((image) => image.src), aspectRatio: '4:5', n: Math.min(4, selectedModules.length) }),
-      });
-      const body = await readApiResponse(response);
-      const tasks = (body.data || [body]).map((item) => item.task_id || item.id).filter(Boolean);
-      if (!tasks.length && body.data?.some((item) => item.url)) {
-        setGenerated(body.data.map((item) => item.url)); setProgress(100); setStatus('done'); return;
-      }
-      setStatus('polling'); setNotice(`已创建 ${tasks.length} 个任务，正在生成…`);
-      const urls = [];
-      for (let attempt = 0; attempt < 80 && urls.length < tasks.length; attempt += 1) {
-        await sleep(3000);
-        const results = await Promise.all(tasks.map((id) => fetch(apiUrl(`/api/tasks/${encodeURIComponent(id)}`), {
-          headers: authHeader(authToken),
-        }).then(readApiResponse)));
-        urls.splice(0, urls.length, ...results.flatMap((r) => r.url || r.image_url || r.data?.[0]?.url ? [r.url || r.image_url || r.data?.[0]?.url] : []));
-        const avg = results.reduce((sum, r) => sum + (r.progress || (r.status === 'completed' ? 100 : 10)), 0) / Math.max(results.length, 1);
-        setProgress(Math.max(10, Math.round(avg)));
-        const failed = results.find((r) => r.status === 'failed' || r.error);
-        if (failed) throw new Error(failed.error?.message || failed.message || '图片生成失败');
-      }
-      if (!urls.length) throw new Error('生成时间较长，请稍后重试');
+      const urls = await submitAndPoll({ prompt, images, aspectRatio: '4:5', count: Math.min(4, selectedModules.length), authToken, onProgress: setProgress });
       setGenerated(urls); setProgress(100); setStatus('done'); setNotice(`已生成 ${urls.length} 张图片`);
     } catch (error) {
       setStatus('error'); setProgress(0); setNotice(error.message);
@@ -410,29 +387,40 @@ function toDataUrl(file) {
 }
 
 async function submitAndPoll({ prompt, images, aspectRatio, count, authToken, onProgress }) {
-  const response = await fetch(apiUrl('/api/generate'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...authHeader(authToken) },
-    body: JSON.stringify({ prompt, referenceImages: images.map((image) => image.src), aspectRatio, n: count }),
-  });
-  const body = await readApiResponse(response);
-  if (body.data?.some((item) => item.url)) return body.data.map((item) => item.url).filter(Boolean);
-  const tasks = (body.data || [body]).map((item) => item.task_id || item.id).filter(Boolean);
-  if (!tasks.length) throw new Error('接口未返回任务 ID');
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    await sleep(3000);
-    const results = await Promise.all(tasks.map(async (id) => {
-      const result = await fetch(apiUrl(`/api/tasks/${encodeURIComponent(id)}`), {
+  const targetCount = Math.min(Math.max(Number(count) || 1, 1), 4);
+  const urls = [];
+  for (let index = 0; index < targetCount; index += 1) {
+    onProgress(Math.max(5, Math.round((index / targetCount) * 100)));
+    const response = await fetch(apiUrl('/api/generate'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...authHeader(authToken) },
+      body: JSON.stringify({ prompt, referenceImages: images.map((image) => image.src), aspectRatio, n: 1 }),
+    });
+    const body = await readApiResponse(response);
+    const directUrl = body.url || body.image_url || body.data?.find((item) => item.url)?.url;
+    if (directUrl) {
+      urls.push(directUrl);
+      continue;
+    }
+    const taskId = body.task_id || body.id || body.data?.[0]?.task_id || body.data?.[0]?.id;
+    if (!taskId) throw new Error('接口未返回任务 ID');
+    for (let attempt = 0; attempt < 80; attempt += 1) {
+      await sleep(3000);
+      const result = await fetch(apiUrl(`/api/tasks/${encodeURIComponent(taskId)}`), {
         headers: authHeader(authToken),
-      }); return readApiResponse(result);
-    }));
-    onProgress(Math.round(results.reduce((sum, item) => sum + (item.progress || (item.status === 'completed' ? 100 : 10)), 0) / results.length));
-    const failed = results.find((item) => item.status === 'failed' || item.error);
-    if (failed) throw new Error(failed.error?.message || failed.message || '图片生成失败');
-    const urls = results.map((item) => item.url || item.image_url || item.data?.[0]?.url).filter(Boolean);
-    if (urls.length === tasks.length) return urls;
+      }).then(readApiResponse);
+      const taskUrl = result.url || result.image_url || result.data?.[0]?.url;
+      const taskProgress = result.progress || (result.status === 'completed' ? 100 : 10);
+      onProgress(Math.round(((index + taskProgress / 100) / targetCount) * 100));
+      if (result.status === 'failed' || result.error) throw new Error(result.error?.message || result.message || '图片生成失败');
+      if (taskUrl) {
+        urls.push(taskUrl);
+        break;
+      }
+    }
+    if (urls.length <= index) throw new Error('生成时间较长，请稍后重试');
   }
-  throw new Error('生成时间较长，请稍后重试');
+  return urls;
 }
 
 function ipParsedItems(parsed) {
