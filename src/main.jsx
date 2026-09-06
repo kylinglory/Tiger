@@ -114,11 +114,10 @@ function App() {
         setFaceConfigured(Boolean(health.faceConfigured));
         setPptConfigured(Boolean(health.pptConfigured));
         if (!health.authRequired) throw new Error('登录保护尚未在后端启用');
-        if (authToken) {
-          const me = await fetch(apiUrl('/api/me'), { headers: authHeader(authToken) }).then(readApiResponse);
-          if (!me.authRequired || !me.username) throw new Error('登录状态无效');
-          setAuthUser(me.username);
-        }
+        const me = await fetch(apiUrl('/api/me'), { headers: authHeader(authToken) }).then(readApiResponse);
+        if (!me.authRequired || !me.username) throw new Error('登录状态无效');
+        setAuthUser(me.username);
+        if (!authToken) setAuthToken('cookie-session');
       } catch {
         localStorage.removeItem(authStorageKey);
         setAuthToken('');

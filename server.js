@@ -27,13 +27,14 @@ const sessionCookie = 'kg_session';
 const isProduction = process.env.NODE_ENV === 'production';
 
 app.set('trust proxy', 1);
-app.use(cors({
+const apiCors = cors({
   origin(origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
     return callback(new Error('不允许的来源'));
   },
   methods: ['GET', 'POST', 'OPTIONS'],
-}));
+});
+app.use('/api', apiCors);
 app.use(express.json({ limit: '35mb' }));
 app.use(express.urlencoded({ extended: false }));
 
